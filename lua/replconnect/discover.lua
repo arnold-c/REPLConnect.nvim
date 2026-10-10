@@ -18,11 +18,15 @@ function M.dirs(env)
 	return { "/tmp/replconnect-" .. tostring(uv.getuid()) }
 end
 
-local function pid_alive(pid)
+---Whether process `pid` is running.
+---@param pid integer
+---@return boolean
+function M.pid_alive(pid)
 	-- uv.kill returns 0 on success and nil, err on failure (it does not throw).
 	local ok, res = pcall(uv.kill, pid, 0)
 	return ok and res == 0
 end
+local pid_alive = M.pid_alive
 
 local function read_json(path)
 	local f = io.open(path, "r")

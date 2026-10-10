@@ -4,7 +4,7 @@
 --   require("replconnect").setup()
 --   :REPLAttach [pid]   pick (or give the pid of) a running REPL session
 --   :REPLDetach [language]
---   :REPLStop[!] [language]  stop the session's server (! also closes its terminal REPL)
+--   :REPLStop[!] [pid|language]  pick a session and stop its server (! also closes its terminal REPL)
 --
 -- One session is attached per language. Commands act on the language of the
 -- current buffer (see `languages.resolve`): its filetype, else the pane or
@@ -50,7 +50,7 @@ end
 local pane_opener
 local reconnect_after_restart
 -- Command bodies, run once the language is known (defined below).
-local open_vars_for, open_view_for, stop_for, capture_layout_for
+local open_vars_for, open_view_for, capture_layout_for
 
 ---Neovim terminal buffer hosting each language's REPL, when it runs in one.
 ---@type table<string, integer>
@@ -391,17 +391,6 @@ function M.toggle_plots_remote(on)
 	return remote
 end
 
----Stop the attached session's REPLConnect server and detach. The REPL keeps
----running unless `quit` is set and it runs in a Neovim terminal (for example
----one whose window was closed): then that terminal and the REPL are closed too.
----@param language? string default: the current buffer's
----@param quit? boolean
-function M.stop(language, quit)
-	return with_language(language, function(name)
-		stop_for(name, quit)
-	end)
-end
-
 ---Whether `client`'s service can be stopped from Neovim; warns when not.
 ---@param client replconnect.SocketClient
 ---@return boolean
@@ -476,12 +465,6 @@ local function stop_attached(client, quit)
 	end)
 end
 
-function stop_for(language, quit)
-	local client = require_client(language)
-	if client then
-		stop_attached(client, quit)
-	end
-end
 
 ---Open the grid viewer for a dotted access path such as `df` or `nt.field`;
 ---without a path, use the variable under the cursor in the variables pane.
@@ -565,6 +548,141 @@ function M.pick(pid)
 		return M.attach(sessions[1])
 	end
 	require("replconnect.picker").select(sessions, M.attach)
+end
+
+---The attached client serving the discovered session `info`, if any.
+---@param info table discovery record
+---@return replconnect.SocketClient?
+local function attached_client(info)
+	for _, client in pairs(clients) do
+		if client.pid == info.pid and not client.closed then
+			return client
+		end
+	end
+end
+
+---How long a killed process gets to exit on SIGTERM before SIGKILL.
+M.KILL_GRACE_MS = 3000
+
+---Offer to kill a session whose socket accepts connections but whose service
+---never answers, typically a REPL orphaned by a Neovim that did not exit
+---cleanly: it lost its terminal and cannot get back to an idle prompt.
+---@param info table discovery record
+local function kill_unresponsive(info)
+	local label = languages.label(discover.language(info))
+	local question = ("The %s REPL (pid %d) is not responding; it may be left over from a Neovim that "
+		.. "did not exit cleanly.\nKill the process?"):format(label, info.pid)
+	if vim.fn.confirm(question, "&Yes\n&No", 2) ~= 1 then
+		return
+	end
+	if not discover.pid_alive(info.pid) then
+		return notify(("the %s REPL (pid %d) has already exited"):format(label, info.pid))
+	end
+	vim.uv.kill(info.pid, "sigterm")
+	vim.defer_fn(function()
+		local forced = discover.pid_alive(info.pid)
+		if forced then
+			vim.uv.kill(info.pid, "sigkill")
+		end
+		notify(("killed the %s REPL (pid %d%s)"):format(label, info.pid, forced and ", with SIGKILL" or ""))
+	end, M.KILL_GRACE_MS)
+end
+
+---Stop an unattached session's server over a short-lived connection.
+---@param info table discovery record
+---@param quit? boolean
+local function stop_detached(info, quit)
+	socket.connect(info.socket, { client = "replconnect.nvim (stop)", timeout_ms = 2000 }, function(err, client)
+		if err then
+			-- Only a socket that accepted the connection proves the pid is still
+			-- that REPL; a refused one may be stale, with the pid since reused.
+			if err:find("initialize failed: request timed out", 1, true) then
+				return kill_unresponsive(info)
+			end
+			return stop_failed({ message = err })
+		end
+		if not can_shutdown(client) then
+			return client:close()
+		end
+		request_shutdown(client, function()
+			client:close()
+			finish_stop(client.language, info.pid, info.terminal_buf, quit)
+		end, function(e)
+			client:close()
+			stop_failed(e)
+		end)
+	end)
+end
+
+---`sessions` with the current buffer's attached session first, then the
+---other attached ones, then the rest (each group in discovery order).
+---@param sessions table[]
+---@return table[]
+local function stop_order(sessions)
+	local current = M.client()
+	local function rank(info)
+		local client = attached_client(info)
+		return not client and 3 or client == current and 1 or 2
+	end
+	local ordered = {}
+	for group = 1, 3 do
+		for _, info in ipairs(sessions) do
+			if rank(info) == group then
+				ordered[#ordered + 1] = info
+			end
+		end
+	end
+	return ordered
+end
+
+---Ask once before stopping the servers of `infos`; true when confirmed.
+---@param infos table[] discovery records
+---@param quit? boolean
+---@return boolean
+local function confirm_stop(infos, quit)
+	local lines = vim.tbl_map(function(info)
+		local what = (quit and info.terminal_buf) and "stop and close" or "stop the server of"
+		return ("  %s the %s REPL (pid %d)"):format(what, languages.label(discover.language(info)), info.pid)
+	end, infos)
+	local question = (#infos == 1 and "Stop this REPL?" or ("Stop these %d REPLs?"):format(#infos))
+		.. "\n" .. table.concat(lines, "\n")
+	return vim.fn.confirm(question, "&Yes\n&No", 2) == 1
+end
+
+---Pick a running session and, after confirmation, stop its REPLConnect server
+---(detaching first if attached). The REPL keeps running unless `quit` is set
+---and it runs in a Neovim terminal: then that terminal and the REPL close too.
+---The current buffer's attached session is offered first; with snacks.nvim,
+---<Tab> selects several sessions, confirmed together.
+---@param target? integer|string a pid or a language to choose among; default: every session
+---@param quit? boolean
+function M.stop(target, quit)
+	local sessions = find_sessions({
+		pid = type(target) == "number" and target or nil,
+		language = type(target) == "string" and target or nil,
+	})
+	if #sessions == 0 then
+		return
+	end
+	require("replconnect.picker").select(stop_order(sessions), function(infos)
+		if not confirm_stop(infos, quit) then
+			return
+		end
+		for _, info in ipairs(infos) do
+			local client = attached_client(info)
+			if client then
+				stop_attached(client, quit)
+			else
+				stop_detached(info, quit)
+			end
+		end
+	end, {
+		multi = true,
+		title = quit and "Stop and close REPL" or "Stop REPL",
+		format_item = function(info)
+			return discover.label(info) .. (attached_client(info) and " · attached" or "")
+		end,
+	})
 end
 
 local completion_listener = false
@@ -662,9 +780,9 @@ function M.setup(opts)
 		M.detach(language_arg(cmd))
 	end, { nargs = "?", complete = complete_language, desc = "Detach from a REPL: [language]" })
 	vim.api.nvim_create_user_command("REPLStop", function(cmd)
-		M.stop(language_arg(cmd), cmd.bang)
+		M.stop(tonumber(cmd.args) or language_arg(cmd), cmd.bang)
 	end, { bang = true, nargs = "?", complete = complete_language,
-		desc = "Stop the REPL's REPLConnect server (! also closes a REPL in a Neovim terminal): [language]" })
+		desc = "Pick a REPL and stop its REPLConnect server (! also closes a REPL in a Neovim terminal): [pid|language]" })
 	vim.api.nvim_create_user_command("REPLVariables", function(cmd)
 		M.open_vars(language_arg(cmd))
 	end, { nargs = "?", complete = complete_language, desc = "Open the variables pane: [language]" })

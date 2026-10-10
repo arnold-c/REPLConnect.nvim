@@ -69,8 +69,12 @@ Commands:
   Settings under `repl` apply to every language; `repl.julia` and `repl.r` override them and set each `command` (a top-level `repl.command` is ignored).
   Each language comes from its own optional extension plugin, not a default ([arnold-c/REPLConnect.jl](https://github.com/arnold-c/REPLConnect.jl), [arnold-c/REPLConnect.R](https://github.com/arnold-c/REPLConnect.R); see the README).
   `:REPLStart` only offers the languages whose plugin is installed.
-- `:REPLStop` stops the attached REPL's server and detaches; Julia keeps running.
+- `:REPLStop [pid|language]` opens a picker over every running REPL (attached or not), with the current buffer's attached REPL first, and asks for confirmation before stopping its server.
+  With [snacks.nvim](https://github.com/folke/snacks.nvim), `<Tab>` selects several REPLs to stop at once, after a single confirmation.
+  An attached REPL is detached; the REPL itself keeps running.
   `:REPLStop!` also closes a REPL running in a Neovim terminal, for example after its window was closed and the REPL is no longer visible.
+  A pid or language narrows the picker to matching sessions.
+  A REPL that accepts the connection but never answers (typically left over from a Neovim that did not exit cleanly) is offered to be killed instead, after a second confirmation: SIGTERM, then SIGKILL if it is still running a few seconds later.
 - `:REPLAttach [pid]`, `:REPLDetach` (attach to a REPL you started yourself).
   With several REPLs running, `:REPLAttach` opens a picker; if [snacks.nvim](https://github.com/folke/snacks.nvim) is installed, it previews the last few inputs of the highlighted REPL (otherwise it falls back to `vim.ui.select`).
   The last 10 inputs are kept for this; turn it off at any time with `REPLConnect.record_history!(false)`.
@@ -84,7 +88,7 @@ Commands:
 
 One REPL is attached per language.
 Commands act on the language of the current buffer: its filetype (a Julia file means the Julia REPL), else the pane or REPL terminal it belongs to, else the only attached REPL; if several are attached and none of these applies, you are asked which.
-`:REPLVariables`, `:REPLPlots`, `:REPLDetach` and `:REPLStop` also take the language explicitly, e.g. `:REPLVariables julia`.
+`:REPLVariables`, `:REPLPlots` and `:REPLDetach` also take the language explicitly, e.g. `:REPLVariables julia`.
 
 The pane's window bar shows the session and its state:
 
