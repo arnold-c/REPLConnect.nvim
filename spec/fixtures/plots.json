@@ -1,0 +1,7 @@
+{
+  "cases": [
+    {"request": {"jsonrpc":"2.0","id":1,"method":"plots"}, "response": {"jsonrpc":"2.0","id":1,"result":{"plots":[]}}},
+    {"request": {"jsonrpc":"2.0","id":2,"method":"plots_subscribe"}, "response": {"jsonrpc":"2.0","id":2,"result":{"plots":[]}}}
+  ],
+  "notification": {"jsonrpc":"2.0","method":"display","params":{"id":7,"mime":"image/svg+xml","path":"/tmp/replconnect-501/1234-plots-example/7.svg"}}
+}
