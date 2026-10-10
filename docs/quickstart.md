@@ -1,6 +1,17 @@
-# REPLConnect quickstart (development)
+# REPLConnect quickstart
 
-Julia side, with REPLConnect installed (`]dev /path/to/REPLConnect.jl` into your default environment), in `~/.julia/config/startup.jl`:
+## In short
+
+1. Install `arnold-c/REPLConnect.nvim` and a language plugin (`REPLConnect.jl` or `REPLConnect.R`); see the [README](../README.md#installation).
+2. Run `:REPLStart` in a Julia or R buffer. It opens a terminal split and attaches.
+3. Run `:REPLVariables` for the variables pane, `:REPLVariableViewer name` (or `v` on a variable) for a grid, `:REPLPlots` for plots.
+4. `:REPLStop` stops a server; `:REPLDetach` just disconnects.
+
+To attach to a REPL you started yourself, load the server in it (Julia below), then run `:REPLAttach`.
+
+## Julia side
+
+With REPLConnect.jl installed (`]dev /path/to/REPLConnect.jl` into your default environment), in `~/.julia/config/startup.jl`:
 
 ```julia
 if isinteractive()
@@ -33,9 +44,9 @@ This listens on `/tmp/replconnect-<uid>/<pid>.sock` and writes `<pid>.json` next
 Set `REPLCONNECT_DIR` to use another directory; it must then be set for both Julia and Neovim.
 `TMPDIR`/`XDG_RUNTIME_DIR` are ignored because the two processes often see different values (e.g. macOS GUI apps, tmux).
 
-Neovim side:
+## Neovim side
 
-With lazy.nvim, use a local plugin spec.
+For a local checkout with lazy.nvim, use a local plugin spec.
 lazy.nvim resets the runtimepath, so a manual `runtimepath:append` before `lazy.setup()` is dropped:
 
 ```lua
@@ -59,7 +70,7 @@ vim.opt.runtimepath:append("/path/to/REPLConnect.nvim")
 require("replconnect").setup()
 ```
 
-Commands:
+## Commands
 
 - `:REPLStart [vertical|horizontal] [julia|r] [REPL switches]` opens a terminal split running the REPL for the current buffer's language (asking when no buffer, pane or single attached session decides) and attaches as soon as its server is up.
   The direction overrides `repl.split` for this start; Neovim's modifiers work too (`:horizontal REPLStart`).
@@ -86,6 +97,8 @@ Commands:
   `g?` lists the pane's keys.
 - `:REPLPlots` toggles static plot history.
   Enable Julia capture with `REPLConnect.capture_plots!(true)`; see [plots.md](plots.md) for renderers, keymaps and saving.
+- `:REPLPlotsRemote [on|off]` toggles streaming plot images to a remote terminal via Snacks; see [plots.md](plots.md).
+- `:REPLLayout[!]` captures the current pane sizes as a layout string and copies it (`!` also applies it this session); see the README.
 - `:REPLVariableViewer [name[.field]]` opens a grid for a table or array.
   In the pane, `v` opens the variable under the cursor.
 

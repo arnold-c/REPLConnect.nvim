@@ -3,6 +3,12 @@
 Inspect a plain Julia REPL from Neovim: a variables pane, a grid viewer for tables and arrays, runtime completion, and an opt-in static plot viewer.
 Setup is in [docs/quickstart.md](docs/quickstart.md); plot capture, renderers and saving are in [docs/plots.md](docs/plots.md).
 
+## Requirements
+
+- Neovim 0.10 or later (window moves need it).
+- A language plugin for each REPL you want to inspect (see below).
+- Optional: [snacks.nvim](https://github.com/folke/snacks.nvim) (pickers, plot rendering, remote plot streaming) and [image.nvim](https://github.com/3rd/image.nvim) (plot rendering).
+
 ## Installation
 
 The core supports no language by itself: the language plugins below are optional extensions, not defaults, and none is installed with the core.
@@ -43,6 +49,23 @@ Add only the ones you need:
 | R | [arnold-c/REPLConnect.R](https://github.com/arnold-c/REPLConnect.R) | `replconnect.r` |
 
 `:REPLStart` only offers languages whose plugin is installed.
+
+## Commands
+
+| Command | Effect |
+| --- | --- |
+| `:REPLStart [vertical\|horizontal] [language] [switches]` | Start a REPL in a terminal split and attach |
+| `:REPLAttach [pid]` | Attach to a REPL you started yourself (picker when several) |
+| `:REPLDetach [language]` | Detach; the REPL keeps running |
+| `:REPLStop[!] [pid\|language]` | Pick a REPL and stop its server (`!` also closes a Neovim terminal REPL) |
+| `:REPLVariables [language]` | Toggle the variables pane |
+| `:REPLVariableViewer [name[.field]]` | Open a table or array in a grid (`v` in the variables pane) |
+| `:REPLPlots [language]` | Toggle static plot history |
+| `:REPLPlotsRemote [on\|off]` | Toggle streaming plot images to a remote terminal (Snacks) |
+| `:REPLLayout[!]` | Capture current pane sizes as a layout string |
+
+Press `g?` in the variables pane for its keys.
+See [docs/quickstart.md](docs/quickstart.md) for details.
 
 ## Configuration
 
@@ -346,5 +369,20 @@ Opt-in plot capture (`REPLConnect.capture_plots!(true)`) additionally renders su
 > Even so, its small status checks still run at every yield, so close the pane (or `:REPLDetach`) for timing-sensitive runs.
 > `update_while_busy = true` makes this worse by also fetching variable changes during a computation.
 > Leave it off unless you need live progress variables.
+
+## Documentation
+
+- [Quickstart](docs/quickstart.md): setup, commands, pane states
+- [Configuration](docs/configuration.md) and [environment](docs/environment.md)
+- [Plots](docs/plots.md) and [viewer](docs/viewer.md)
+- [Protocol](docs/protocol.md), [R debugging](docs/r-debugging.md), [attribution](docs/attribution.md)
+
+## Development
+
+Run the test suite with `tests/run.sh`.
+
+## License
+
+[Elastic License 2.0](LICENSES/Elastic-2.0.txt).
 
 ---
