@@ -88,9 +88,12 @@ local function snacks_select(Snacks, sessions, on_choice, opts)
 		format = "text",
 		preview = show,
 		confirm = function(picker, item)
+			-- With `multi`, the <Tab>-selected items, else the one under the cursor.
+			local chosen = opts.multi and picker:selected({ fallback = true }) or { item }
 			picker:close()
-			if item then
-				on_choice(item.session)
+			local choices = vim.tbl_map(function(i) return i.session end, chosen)
+			if #choices > 0 then
+				on_choice(opts.multi and choices or choices[1])
 			end
 		end,
 	})
@@ -106,8 +109,10 @@ local function snacks_select(Snacks, sessions, on_choice, opts)
 	end
 end
 
----Pick one of `sessions` and call `on_choice(info)`.
----@param opts? { title?: string, format_item?: fun(info: table): string }
+---Pick one of `sessions` and call `on_choice(info)`. With `opts.multi`,
+---`on_choice` gets a list instead: several sessions with snacks (<Tab> to
+---select), one with vim.ui.select.
+---@param opts? { title?: string, format_item?: fun(info: table): string, multi?: boolean }
 function M.select(sessions, on_choice, opts)
 	opts = vim.tbl_extend("force", { title = "Attach to REPL", format_item = discover.label }, opts or {})
 	local ok, Snacks = pcall(require, "snacks")
@@ -116,7 +121,7 @@ function M.select(sessions, on_choice, opts)
 	end
 	vim.ui.select(sessions, { prompt = opts.title, format_item = opts.format_item }, function(choice)
 		if choice then
-			on_choice(choice)
+			on_choice(opts.multi and { choice } or choice)
 		end
 	end)
 end
