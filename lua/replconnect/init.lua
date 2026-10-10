@@ -570,8 +570,15 @@ M.KILL_GRACE_MS = 3000
 ---@param info table discovery record
 local function kill_unresponsive(info)
 	local label = languages.label(discover.language(info))
-	local question = ("The %s REPL (pid %d) is not responding; it may be left over from a Neovim that "
-		.. "did not exit cleanly.\nKill the process?"):format(label, info.pid)
+	-- Show the command: a non-interactive process (e.g. a language server)
+	-- that started the service never answers either, and must not be killed.
+	local command = discover.command(info.pid) or "(command unavailable)"
+	if #command > 200 then
+		command = command:sub(1, 200) .. "\u{2026}"
+	end
+	local question = ("The %s session (pid %d) is not responding. It may be a REPL left over from a Neovim "
+		.. "that did not exit cleanly, or a non-interactive process such as a language server.\n"
+		.. "Process: %s\nKill this process?"):format(label, info.pid, command)
 	if vim.fn.confirm(question, "&Yes\n&No", 2) ~= 1 then
 		return
 	end

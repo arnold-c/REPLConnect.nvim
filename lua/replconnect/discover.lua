@@ -28,6 +28,17 @@ function M.pid_alive(pid)
 end
 local pid_alive = M.pid_alive
 
+---Command line of process `pid` (via `ps`), or nil when unavailable.
+---@param pid integer
+---@return string?
+function M.command(pid)
+	local ok, result = pcall(function()
+		return vim.system({ "ps", "-ww", "-o", "command=", "-p", tostring(pid) }, { text = true }):wait(1000)
+	end)
+	local command = ok and result.code == 0 and vim.trim(result.stdout or "") or ""
+	return command ~= "" and command or nil
+end
+
 local function read_json(path)
 	local f = io.open(path, "r")
 	if not f then
