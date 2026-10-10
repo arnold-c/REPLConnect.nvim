@@ -1,4 +1,4 @@
-test: nvim_tests
+tests: nvim_tests
 
 nvim_tests:
 	./tests/run.sh

@@ -23,6 +23,58 @@ function M.parent_pid(pid)
 	return tonumber(vim.trim(result.stdout or ""))
 end
 
+---Executable name of `pid` (basename, via `ps`), or nil.
+---@param pid integer
+---@return string?
+function M.process_name(pid)
+	local ok, result = pcall(function()
+		return vim.system({ "ps", "-o", "comm=", "-p", tostring(pid) }, { text = true }):wait()
+	end)
+	if not ok or result.code ~= 0 then
+		return nil
+	end
+	local name = vim.trim(result.stdout or "")
+	return name ~= "" and vim.fs.basename(name) or nil
+end
+
+---@class replconnect.OriginOptions
+---@field launched? table<integer, boolean> pids this Neovim started with :REPLStart
+---@field terminal_buf? integer this Neovim's terminal buffer running the process
+---@field self_pid? integer default: this Neovim's pid
+---@field parent? fun(pid: integer): integer? replaceable for tests
+---@field name? fun(pid: integer): string? replaceable for tests
+
+---Where process `pid` runs relative to this Neovim, for pickers: started here,
+---in a terminal here, a non-terminal child here (e.g. a language server), in
+---another Neovim, orphaned (its parent exited), or external.
+---@param pid integer
+---@param opts? replconnect.OriginOptions
+---@return string
+function M.origin(pid, opts)
+	opts = opts or {}
+	local parent, name = opts.parent or M.parent_pid, opts.name or M.process_name
+	local self_pid = opts.self_pid or vim.fn.getpid()
+	if opts.launched and opts.launched[pid] then
+		return "started by this Neovim"
+	end
+	if opts.terminal_buf then
+		return "in a terminal of this Neovim"
+	end
+	local chain = M.ancestors(pid, parent)
+	if #chain == 1 and parent(pid) == 1 then
+		return "orphaned (its parent exited)"
+	end
+	for i = 2, #chain do
+		if chain[i] == self_pid then
+			return "child of this Neovim, not a terminal"
+		end
+		if name(chain[i]) == "nvim" then
+			return ("in another Neovim (pid %d)"):format(chain[i])
+		end
+	end
+	return "external"
+end
+
 ---`pid` followed by its ancestors, nearest first (stops at pid 1 or on lookup failure).
 ---@param pid integer
 ---@param parent? fun(pid: integer): integer? Replaceable for tests.

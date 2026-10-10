@@ -46,4 +46,29 @@ assert(discover.label({ pid = 3, cwd = "/x", project = "", terminal_buf = 9 }):f
 assert(not discover.label({ pid = 3, cwd = "/x", project = "" }):find("nvim terminal", 1, true))
 
 vim.api.nvim_buf_delete(bufnr, { force = true })
+-- origin: where a session runs relative to this Neovim (pid 50 here)
+local tree = { [400] = 300, [300] = 50, [500] = 60, [60] = 2, [700] = 1, [800] = 70, [70] = 2 }
+local names = { [50] = "nvim", [60] = "nvim", [70] = "zsh", [300] = "node" }
+local function origin(pid, extra)
+	return terminal.origin(pid, vim.tbl_extend("force", {
+		self_pid = 50,
+		parent = function(p) return tree[p] end,
+		name = function(p) return names[p] end,
+	}, extra or {}))
+end
+eq(origin(400, { launched = { [400] = true } }), "started by this Neovim")
+eq(origin(400, { terminal_buf = 3 }), "in a terminal of this Neovim")
+eq(origin(400), "child of this Neovim, not a terminal") -- e.g. a language server
+eq(origin(500), "in another Neovim (pid 60)")
+eq(origin(700), "orphaned (its parent exited)")
+eq(origin(800), "external")
+
+-- labels show the origin when given, else whether it is in one of our terminals
+local info = { pid = 9, cwd = "/tmp", language = "julia" }
+-- right after the language
+assert(discover.label(info, "external"):find("^julia \u{b7} external \u{b7} /tmp "), discover.label(info, "external"))
+assert(not discover.label(info):find("nvim terminal", 1, true))
+info.terminal_buf = 1
+assert(discover.label(info):find("^julia \u{b7} nvim terminal \u{b7} "), discover.label(info))
+
 print("terminal tests passed")

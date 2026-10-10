@@ -102,17 +102,20 @@ function M.language(info)
 end
 
 ---One-line description for a picker.
-function M.label(info)
+---@param info table discovery record
+---@param where? string where it runs (default: "nvim terminal" when in one of ours)
+function M.label(info, where)
 	local started = info.started_at and os.date("%H:%M:%S", info.started_at) or "?"
 	local project = (info.project or "") ~= "" and vim.fn.fnamemodify(info.project, ":h:t") or "-"
-	local where = info.terminal_buf and " · nvim terminal" or ""
-	return ("%s · %s · %s · pid %d · %s%s"):format(
+	where = where or (info.terminal_buf and "nvim terminal")
+	where = where and (" · " .. where) or ""
+	return ("%s%s · %s · %s · pid %d · %s"):format(
 		require("replconnect.languages").label(M.language(info)),
+		where,
 		vim.fn.fnamemodify(info.cwd or "", ":~"),
 		project,
 		info.pid,
-		started,
-		where
+		started
 	)
 end
 

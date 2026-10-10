@@ -75,6 +75,7 @@ Commands:
   An attached REPL is detached; the REPL itself keeps running.
   `:REPLStop!` also closes a REPL running in a Neovim terminal, for example after its window was closed and the REPL is no longer visible.
   A pid or language narrows the picker to matching sessions.
+  Each entry says where the REPL runs: started by this Neovim, in a terminal of this Neovim, a child of this Neovim that is not a terminal (such as a language server), in another Neovim, orphaned (its parent exited), or external.
   A REPL that accepts the connection but never answers (typically left over from a Neovim that did not exit cleanly) is offered to be killed instead, after a second confirmation that shows the process's command line: SIGTERM, then SIGKILL if it is still running a few seconds later.
   Check that command: a non-interactive process that started the service (for example R's `languageserver`) never answers either, and killing it ends your language server.
 - `:REPLAttach [pid]`, `:REPLDetach` (attach to a REPL you started yourself).

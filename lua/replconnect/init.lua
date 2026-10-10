@@ -671,6 +671,15 @@ function M.stop(target, quit)
 	if #sessions == 0 then
 		return
 	end
+	-- Where each session runs, so leftovers and other editors' REPLs stand out.
+	local launched, origins = {}, {}
+	for _, pid in ipairs(require("replconnect.repl").launched_pids()) do
+		launched[pid] = true
+	end
+	for _, info in ipairs(sessions) do
+		origins[info] = require("replconnect.terminal").origin(info.pid,
+			{ launched = launched, terminal_buf = info.terminal_buf })
+	end
 	require("replconnect.picker").select(stop_order(sessions), function(infos)
 		if not confirm_stop(infos, quit) then
 			return
@@ -687,7 +696,7 @@ function M.stop(target, quit)
 		multi = true,
 		title = quit and "Stop and close REPL" or "Stop REPL",
 		format_item = function(info)
-			return discover.label(info) .. (attached_client(info) and " · attached" or "")
+			return discover.label(info, origins[info]) .. (attached_client(info) and " · attached" or "")
 		end,
 	})
 end

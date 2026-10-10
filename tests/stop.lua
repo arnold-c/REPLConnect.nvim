@@ -181,7 +181,9 @@ messages, asked = {}, #questions
 plugin.stop(orphan_pid)
 assert(vim.wait(5000, function() return #questions == asked + 2 end), vim.inspect(questions))
 assert(questions[#questions]:find("is not responding", 1, true), vim.inspect(questions))
-assert(questions[#questions]:find("Process: sleep 60", 1, true), "the question names the process")
+-- ps may show the resolved path (`/bin/sleep 60` on macOS).
+assert(questions[#questions]:find("Process: [^\n]*sleep 60"),
+	"the question names the process: " .. questions[#questions])
 assert(vim.wait(2000, function() return saw(("killed the Julia REPL (pid %d"):format(orphan_pid)) end),
 	vim.inspect(messages))
 assert(vim.fn.jobwait({ orphan }, 1000)[1] ~= -1, "the orphaned process must end")
