@@ -17,6 +17,16 @@ The result has `protocol_version`, `language`, `language_version`, `pid`,
 `started_at` and a string array `capabilities`. Reject a protocol version
 mismatch; ignore unfamiliar additive capabilities.
 
+Editor ownership: a REPL launched by an editor (`:REPLStart`) gets
+`REPLCONNECT_EDITOR_PID` in its environment. The editor stops such REPLs when
+it exits (SIGTERM, then SIGKILL after a grace period). To cover an editor that
+dies without exiting cleanly, a service should, when this variable is set and
+the process is interactive, check periodically (every few seconds, off the hot
+path) whether that pid is still alive and quit the REPL when it is not. The
+variable is set only for the launched process: services should remove it from
+their own environment at startup so child processes do not inherit it.
+Services should also not start at all in non-interactive processes.
+
 ## Inspection
 
 | Method | Params | Result |

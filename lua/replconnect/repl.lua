@@ -13,6 +13,40 @@ local M = {}
 M.POLL_MS = 500
 M.TIMEOUT_MS = 90000 -- the REPL may precompile or install on first start
 
+---Environment variable telling a launched REPL's service which editor owns
+---it, so it can exit if that editor dies without stopping it.
+M.EDITOR_PID_ENV = "REPLCONNECT_EDITOR_PID"
+
+---Seconds a REPL gets to exit on SIGTERM when Neovim exits, before SIGKILL.
+M.KILL_GRACE_S = 3
+
+---Running REPL jobs started by `start`: job id -> pid.
+---@type table<integer, integer>
+local launched = {}
+
+---Stop every REPL this Neovim launched: SIGTERM now and, from a detached
+---helper that outlives Neovim, SIGKILL after `KILL_GRACE_S` if it is still
+---running. Called on VimLeavePre, so a REPL never outlives its editor, even
+---when its terminal does not end it (e.g. it ignores SIGHUP or is stuck).
+function M.stop_launched()
+	for job, pid in pairs(launched) do
+		launched[job] = nil
+		if vim.fn.jobwait({ job }, 0)[1] == -1 then
+			pcall(uv.kill, pid, "sigterm")
+			pcall(vim.system, {
+				"sh", "-c", ("sleep %s; kill -0 %d 2>/dev/null && kill -KILL %d"):format(M.KILL_GRACE_S, pid, pid),
+			}, { detach = true })
+			pcall(vim.fn.jobstop, job)
+		end
+	end
+end
+
+---Pids of the running REPLs this Neovim launched (for tests and diagnostics).
+---@return integer[]
+function M.launched_pids()
+	return vim.tbl_values(launched)
+end
+
 ---The launch command line for `language`.
 ---@param language replconnect.Language
 ---@param opts replconnect.ReplConfig
@@ -179,6 +213,7 @@ function M.start(name, extra, overrides)
 
 	-- An unlisted scratch buffer (as jet.nvim does), so the REPL does not show up in
 	-- buffer lists or bufferline tabs.
+	env = vim.tbl_extend("force", env or {}, { [M.EDITOR_PID_ENV] = tostring(vim.fn.getpid()) })
 	local bufnr = vim.api.nvim_create_buf(false, true)
 	local win = M.open_split(opts, bufnr)
 	local state = { exited = false }
@@ -187,7 +222,8 @@ function M.start(name, extra, overrides)
 			term = true,
 			cwd = vim.fn.getcwd(),
 			env = env,
-			on_exit = function(_, code)
+			on_exit = function(id, code)
+				launched[id] = nil
 				state.exited = true
 				-- Close after a clean exit; keep the buffer if the REPL failed, so its
 				-- output can be read.
@@ -207,6 +243,7 @@ function M.start(name, extra, overrides)
 		notify("failed to start " .. language.label, vim.log.levels.ERROR)
 		return nil
 	end
+	launched[job] = vim.fn.jobpid(job)
 	-- jobstart names the buffer after the command line; use something readable.
 	vim.bo[bufnr].buflisted = false
 	pcall(vim.api.nvim_buf_set_name, bufnr, ("%s REPL (%d)"):format(language.name, vim.fn.jobpid(job)))

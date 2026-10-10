@@ -753,6 +753,13 @@ function M.setup(opts)
 			end
 		end,
 	})
+	-- REPLs started with :REPLStart never outlive this Neovim.
+	vim.api.nvim_create_autocmd("VimLeavePre", {
+		group = vim.api.nvim_create_augroup("replconnect.exit", { clear = true }),
+		callback = function()
+			require("replconnect.repl").stop_launched()
+		end,
+	})
 	vim.api.nvim_create_autocmd("FileType", {
 		group = vim.api.nvim_create_augroup("replconnect.completion", { clear = true }),
 		-- No pattern: languages register when their plugin loads, possibly after

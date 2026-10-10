@@ -69,6 +69,7 @@ Commands:
   Settings under `repl` apply to every language; `repl.julia` and `repl.r` override them and set each `command` (a top-level `repl.command` is ignored).
   Each language comes from its own optional extension plugin, not a default ([arnold-c/REPLConnect.jl](https://github.com/arnold-c/REPLConnect.jl), [arnold-c/REPLConnect.R](https://github.com/arnold-c/REPLConnect.R); see the README).
   `:REPLStart` only offers the languages whose plugin is installed.
+  REPLs started this way are stopped when Neovim exits (SIGTERM, then SIGKILL after 3 seconds if needed), so they never outlive the editor; REPLs you started yourself and attached to are left running.
 - `:REPLStop [pid|language]` opens a picker over every running REPL (attached or not), with the current buffer's attached REPL first, and asks for confirmation before stopping its server.
   With [snacks.nvim](https://github.com/folke/snacks.nvim), `<Tab>` selects several REPLs to stop at once, after a single confirmation.
   An attached REPL is detached; the REPL itself keeps running.

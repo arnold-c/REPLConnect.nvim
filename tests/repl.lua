@@ -208,4 +208,28 @@ assert(warning:find("run :REPLAttach", 1, true))
 vim.notify = original_notify
 discover.list, plugin.attach, repl.POLL_MS = original_list, original_attach, original_poll
 
+-- Launched REPLs learn their editor's pid and are stopped when Neovim exits,
+-- even one that ignores SIGTERM and SIGHUP (SIGKILL after the grace period).
+discover.list = function() return {} end
+plugin.setup({ completion = false }) -- registers the VimLeavePre cleanup
+local editor_pid = tostring(vim.fn.getpid())
+local function launch(script)
+	config.set({ repl = { enter = false, julia = { command = { "sh", "-c", script } } } })
+	local buf = assert(repl.start("julia"))
+	return vim.b[buf].terminal_job_id
+end
+-- Exits at once (code 1) unless the editor pid is in its environment.
+local polite = launch(('test "$%s" = %s && exec sleep 60'):format(repl.EDITOR_PID_ENV, editor_pid))
+local stubborn = launch("trap '' TERM HUP; exec sleep 60")
+vim.wait(200)
+eq(vim.fn.jobwait({ polite, stubborn }, 0), { -1, -1 })
+eq(#repl.launched_pids(), 2)
+repl.KILL_GRACE_S = 0.2
+vim.api.nvim_exec_autocmds("VimLeavePre", {})
+local codes = vim.fn.jobwait({ polite, stubborn }, 3000)
+assert(codes[1] ~= -1 and codes[2] ~= -1, vim.inspect(codes))
+eq(#repl.launched_pids(), 0)
+discover.list = original_list
+config.set()
+
 print("repl tests passed")
