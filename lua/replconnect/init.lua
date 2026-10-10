@@ -402,34 +402,29 @@ function M.stop(language, quit)
 	end)
 end
 
-function stop_for(language, quit)
-	local client = require_client(language)
-	if not client then
-		return
+---Whether `client`'s service can be stopped from Neovim; warns when not.
+---@param client replconnect.SocketClient
+---@return boolean
+local function can_shutdown(client)
+	if vim.tbl_contains(client.info.capabilities or {}, "shutdown") then
+		return true
 	end
-	local label = languages.label(client.language)
-	if not vim.tbl_contains(client.info.capabilities or {}, "shutdown") then
-		local registered = languages.get(client.language)
-		return notify("this REPLConnect cannot be stopped from Neovim; update it"
-			.. (registered and (", or " .. registered.stop_hint) or ""), vim.log.levels.WARN)
-	end
-	local host, pid, on_close = hosts[client.language], client.pid, client.on_close
-	client.on_close = nil -- the disconnect that follows is expected
+	local registered = languages.get(client.language)
+	notify("this REPLConnect cannot be stopped from Neovim; update it"
+		.. (registered and (", or " .. registered.stop_hint) or ""), vim.log.levels.WARN)
+	return false
+end
+
+---Ask `client`'s service to stop serving. `on_done` runs at most once.
+---@param client replconnect.SocketClient
+---@param on_done fun()
+---@param on_error fun(err: table?)
+local function request_shutdown(client, on_done, on_error)
 	local finished = false
 	local function done()
-		if finished then
-			return
-		end
-		finished = true
-		if clients[client.language] == client then
-			forget(client.language)
-		end
-		if quit and host and vim.api.nvim_buf_is_valid(host) then
-			pcall(vim.api.nvim_buf_delete, host, { force = true }) -- ends the REPL job
-			notify(("stopped and closed the %s REPL (pid %d)"):format(label, pid))
-		else
-			notify(("stopped the REPLConnect server (pid %d)%s"):format(pid,
-				quit and ("; %s is not in a Neovim terminal, so it keeps running"):format(label) or ""))
+		if not finished then
+			finished = true
+			on_done()
 		end
 	end
 	client:request("shutdown", vim.empty_dict(), done, function(err)
@@ -437,9 +432,55 @@ function stop_for(language, quit)
 		if err and err.message == "connection closed" then
 			return done()
 		end
-		client.on_close = on_close
-		notify("stop failed: " .. tostring(err and err.message), vim.log.levels.ERROR)
+		on_error(err)
 	end)
+end
+
+---Report a stopped server; with `quit`, also close its terminal REPL.
+---@param language string
+---@param pid integer
+---@param host? integer terminal buffer running the REPL
+---@param quit? boolean
+local function finish_stop(language, pid, host, quit)
+	local label = languages.label(language)
+	if quit and host and vim.api.nvim_buf_is_valid(host) then
+		pcall(vim.api.nvim_buf_delete, host, { force = true }) -- ends the REPL job
+		notify(("stopped and closed the %s REPL (pid %d)"):format(label, pid))
+	else
+		notify(("stopped the REPLConnect server (pid %d)%s"):format(pid,
+			quit and ("; %s is not in a Neovim terminal, so it keeps running"):format(label) or ""))
+	end
+end
+
+local function stop_failed(err)
+	notify("stop failed: " .. tostring(err and err.message), vim.log.levels.ERROR)
+end
+
+---Stop an attached client's server and detach.
+---@param client replconnect.SocketClient
+---@param quit? boolean
+local function stop_attached(client, quit)
+	if not can_shutdown(client) then
+		return
+	end
+	local host, on_close = hosts[client.language], client.on_close
+	client.on_close = nil -- the disconnect that follows is expected
+	request_shutdown(client, function()
+		if clients[client.language] == client then
+			forget(client.language)
+		end
+		finish_stop(client.language, client.pid, host, quit)
+	end, function(err)
+		client.on_close = on_close
+		stop_failed(err)
+	end)
+end
+
+function stop_for(language, quit)
+	local client = require_client(language)
+	if client then
+		stop_attached(client, quit)
+	end
 end
 
 ---Open the grid viewer for a dotted access path such as `df` or `nt.field`;
@@ -492,22 +533,33 @@ function M.start(language, switches, overrides)
 	end)
 end
 
----Attach to the session with `pid`, or pick one if there are several.
-function M.pick(pid)
+---Running sessions, optionally only those with `pid` or `language`; warns
+---(and returns an empty list) when there are none.
+---@param filter? { pid?: integer, language?: string }
+---@return table[] sessions discovery records
+local function find_sessions(filter)
+	filter = filter or {}
 	local dirs = discover.dirs()
-	local sessions = discover.list({ dirs = dirs })
-	if pid then
-		sessions = vim.tbl_filter(function(s)
-			return s.pid == pid
-		end, sessions)
-	end
+	local sessions = vim.tbl_filter(function(s)
+		return (not filter.pid or s.pid == filter.pid)
+			and (not filter.language or discover.language(s) == filter.language)
+	end, discover.list({ dirs = dirs }))
 	if #sessions == 0 then
-		return notify(
+		notify(
 			"no running REPL found in:\n  "
 				.. table.concat(dirs, "\n  ")
 				.. "\nstart a REPL with REPLConnect, or use :REPLStart (see docs/quickstart.md)",
 			vim.log.levels.WARN
 		)
+	end
+	return sessions
+end
+
+---Attach to the session with `pid`, or pick one if there are several.
+function M.pick(pid)
+	local sessions = find_sessions({ pid = pid })
+	if #sessions == 0 then
+		return
 	end
 	if #sessions == 1 then
 		return M.attach(sessions[1])

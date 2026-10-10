@@ -66,10 +66,10 @@ function M.fetch(info, callback)
 	end)
 end
 
-local function snacks_select(Snacks, sessions, on_choice)
+local function snacks_select(Snacks, sessions, on_choice, opts)
 	local transcripts = {}
 	local items = vim.tbl_map(function(info)
-		return { text = discover.label(info), session = info }
+		return { text = opts.format_item(info), session = info }
 	end, sessions)
 
 	local function show(ctx)
@@ -83,7 +83,7 @@ local function snacks_select(Snacks, sessions, on_choice)
 	end
 
 	local picker = Snacks.picker.pick({
-		title = "Attach to REPL",
+		title = opts.title,
 		items = items,
 		format = "text",
 		preview = show,
@@ -107,12 +107,14 @@ local function snacks_select(Snacks, sessions, on_choice)
 end
 
 ---Pick one of `sessions` and call `on_choice(info)`.
-function M.select(sessions, on_choice)
+---@param opts? { title?: string, format_item?: fun(info: table): string }
+function M.select(sessions, on_choice, opts)
+	opts = vim.tbl_extend("force", { title = "Attach to REPL", format_item = discover.label }, opts or {})
 	local ok, Snacks = pcall(require, "snacks")
 	if ok and Snacks.picker then
-		return snacks_select(Snacks, sessions, on_choice)
+		return snacks_select(Snacks, sessions, on_choice, opts)
 	end
-	vim.ui.select(sessions, { prompt = "Attach to REPL", format_item = discover.label }, function(choice)
+	vim.ui.select(sessions, { prompt = opts.title, format_item = opts.format_item }, function(choice)
 		if choice then
 			on_choice(choice)
 		end
