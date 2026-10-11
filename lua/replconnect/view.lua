@@ -141,14 +141,70 @@ local render = function(page, title, help)
 	return lines, tabs
 end
 
+---The client's viewer state, created on first use.
+local state_for = function(client)
+	viewers[client] = viewers[client] or { request = 0 }
+	return viewers[client]
+end
+
+---Take over the client's viewer buffer for a new selection: reuse or create it,
+---drop the previous selection's mappings and highlighting, and show and focus
+---it at the top-left through the layout opener.
+---@return integer buf
+local present = function(client, state, generation)
+	local buf = M.buffer(client) or vim.api.nvim_create_buf(false, true)
+	state.buf, state.active = buf, generation
+	for _, key in ipairs(state.keys or {}) do
+		pcall(vim.keymap.del, "n", key, { buffer = buf })
+	end
+	state.keys = {}
+	pcall(vim.treesitter.stop, buf)
+	vim.bo[buf].syntax = ""
+	local win = state.opener and state.opener()
+		or require("replconnect.layout").show("view", { view = buf })
+	vim.api.nvim_set_current_win(win)
+	vim.api.nvim_win_set_cursor(win, { 1, 0 })
+	vim.api.nvim_win_call(win, function() vim.fn.winrestview({ topline = 1, leftcol = 0 }) end)
+	vim.bo[buf].bufhidden = "hide"
+	vim.bo[buf].swapfile = false
+	vim.bo[buf].filetype = "inspectview"
+	vim.wo.wrap = false
+	vim.wo.number = false
+	vim.wo.relativenumber = false
+	vim.wo.signcolumn = "no"
+	vim.wo.foldcolumn = "0"
+	return buf
+end
+
+---Install the enabled actions' bindings on the viewer buffer, remembering them
+---so the next selection can remove them.
+---@param handlers table<string, string | function> Actions without a handler are skipped.
+local bind = function(buf, state, keymaps, handlers)
+	for _, action in ipairs(actions) do
+		local handler = handlers[action[1]]
+		for _, key in ipairs(handler and keys_for(keymaps, action[1]) or {}) do
+			vim.keymap.set("n", key, handler, {
+				buffer = buf, silent = true, desc = "REPLVariableViewer: " .. action[2],
+			})
+			state.keys[#state.keys + 1] = key
+		end
+	end
+end
+
+---Replace the buffer's text, keeping it read-only.
+local set_lines = function(buf, lines)
+	vim.bo[buf].modifiable = true
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	vim.bo[buf].modifiable = false
+end
+
 ---Select an access path in the client\'s reusable viewer using `viewer_page`.
 ---Only successful, current requests replace its contents and open the pane.
 ---Request errors are reported with vim.notify. Bindings are snapshotted on selection.
 ---@param client replconnect.SocketClient
 ---@param path string[] Global name followed by child access keys, not expressions.
 M.open = function(client, path)
-	viewers[client] = viewers[client] or { request = 0 }
-	local state = viewers[client]
+	local state = state_for(client)
 	state.request = state.request + 1
 	local generation = state.request
 	local initialized = false
@@ -184,26 +240,8 @@ M.open = function(client, path)
 					busy = false
 					if not current() or (buf and not vim.api.nvim_buf_is_valid(buf)) then return end
 					if not initialized then
-						buf = M.buffer(client) or vim.api.nvim_create_buf(false, true)
-						state.buf, state.active = buf, generation
+						buf = present(client, state, generation)
 						initialized = true
-						for _, key in ipairs(state.keys or {}) do
-							pcall(vim.keymap.del, "n", key, { buffer = buf })
-						end
-						state.keys = {}
-						local win = state.opener and state.opener()
-							or require("replconnect.layout").show("view", { view = buf })
-						vim.api.nvim_set_current_win(win)
-						vim.api.nvim_win_set_cursor(win, { 1, 0 })
-						vim.api.nvim_win_call(win, function() vim.fn.winrestview({ topline = 1, leftcol = 0 }) end)
-						vim.bo[buf].bufhidden = "hide"
-						vim.bo[buf].swapfile = false
-						vim.bo[buf].filetype = "inspectview"
-						vim.wo.wrap = false
-						vim.wo.number = false
-						vim.wo.relativenumber = false
-						vim.wo.signcolumn = "no"
-						vim.wo.foldcolumn = "0"
 						local handlers = {
 							close = "<cmd>close<cr>",
 							refresh = function() load(offset) end,
@@ -229,23 +267,14 @@ M.open = function(client, path)
 								vim.api.nvim_win_set_cursor(mouse.winid, { mouse.line, math.max(0, mouse.column - 1) })
 							end
 						end
-						for _, action in ipairs(actions) do
-							for _, key in ipairs(keys_for(keymaps, action[1])) do
-								vim.keymap.set("n", key, handlers[action[1]], {
-									buffer = buf, silent = true, desc = "REPLVariableViewer: " .. action[2],
-								})
-								state.keys[#state.keys + 1] = key
-							end
-						end
+						bind(buf, state, keymaps, handlers)
 					end
 					offset, total = page.offset, page.total_rows
 					slice = type(page.slice) == "number" and page.slice or nil
 					slice_first, slice_last = page.slice_first, page.slice_last
 					local lines
 					lines, tabs = render(page, title, help)
-					vim.bo[buf].modifiable = true
-					vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-					vim.bo[buf].modifiable = false
+					set_lines(buf, lines)
 				end)
 			end, function(err)
 				busy = false
