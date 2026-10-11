@@ -712,6 +712,14 @@ function Vars:flatten()
 			table.insert(categories[category(var.kind)], var)
 		end
 	end
+	local by_name = function(a, b)
+		local x, y = a.display_name:lower(), b.display_name:lower()
+		if x ~= y then return x < y end
+		return a.display_name < b.display_name
+	end
+	for _, vars in pairs(categories) do
+		table.sort(vars, by_name)
+	end
 
 	local out = {}
 
