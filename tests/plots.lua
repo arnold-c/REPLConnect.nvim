@@ -69,7 +69,18 @@ pending.callback({ plots = { two, three } })
 assert(#pane.records == 3 and pane.records[1].id == 2 and pane.selected == 3)
 pane:latest()
 assert(pane.selected == 4)
+-- Only resizing the plot window redraws; unrelated floats (completion menus)
+-- resize while typing and must not make the image flicker.
 local before = #renders
+local float = vim.api.nvim_open_win(vim.api.nvim_create_buf(false, true), false,
+	{ relative = "editor", row = 0, col = 0, width = 10, height = 2 })
+pane:resized({ float })
+pane:resized(nil)
+assert(#renders == before, "unrelated resize must not redraw plots")
+vim.api.nvim_win_close(float, true)
+pane:resized({ focus, pane:winid() })
+assert(#renders == before + 1, "resizing the plot window must redraw it")
+before = #renders
 pane:hide()
 assert(not pane:winid() and clears > 0)
 config.options.plots.auto_open = false -- pane retains its own options table

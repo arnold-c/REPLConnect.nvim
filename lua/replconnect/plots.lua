@@ -45,7 +45,11 @@ function Plots.init(client, opts, open_window, may_auto_open)
 	self.group = vim.api.nvim_create_augroup("replconnect.plots." .. self.buf, { clear = true })
 	vim.api.nvim_create_autocmd({ "BufHidden", "BufWipeout" }, { group = self.group, buffer = self.buf,
 		callback = function() self:clear_image() end })
-	vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, { group = self.group,
+	-- WinResized also fires for unrelated floats (completion menus resize on
+	-- every keystroke); redrawing then would make the image flicker.
+	vim.api.nvim_create_autocmd("WinResized", { group = self.group,
+		callback = function() self:resized(vim.v.event.windows) end })
+	vim.api.nvim_create_autocmd("VimResized", { group = self.group,
 		callback = function() if self:winid() then self:draw() end end })
 	-- Install before subscribing; merge the snapshot with already delivered events.
 	self.unsubscribe = client:on("display", function(record)
@@ -118,6 +122,13 @@ function Plots:draw()
 			vim.notify("replconnect: image renderer unavailable; press o to open externally: " .. tostring(err), vim.log.levels.WARN)
 		end
 	end
+end
+
+---Redraw only when the plot window is among the resized `windows`.
+---@param windows? integer[]
+function Plots:resized(windows)
+	local win = self:winid()
+	if win and vim.tbl_contains(windows or {}, win) then self:draw() end
 end
 
 function Plots:move(delta)
