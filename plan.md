@@ -802,6 +802,19 @@ Lua first (structural, Julia keeps working), then the R service.
   `:restart`, plots). `docs/protocol.md`: discovery `language`, R5,
   off-thread `status`.
 
+### Phase 19 — Function definitions
+
+Behavioural, additive `definition` capability (docs/protocol.md,
+`spec/fixtures/definition.json`, service guide `docs/definition-hook.md`).
+In the variables pane, `v` on a function shows each method's source in the
+reusable viewer; `gd` opens the defining file at its line in an editor
+window, picking among methods with `vim.ui.select`. Stale lines are warned
+about (source's first line not on that line, else file mtime newer than
+loaded). Without a readable file or the capability, `gd` warns and falls
+back to other language servers' `workspace/symbol`. Editor side in
+`definition.lua`; Julia/R services are implemented in their own repos.
+Tests: `tests/definition.lua` (needs Neovim).
+
 ### Later
 
 - Hover and signature help.

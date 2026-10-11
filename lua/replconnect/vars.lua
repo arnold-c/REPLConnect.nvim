@@ -437,7 +437,23 @@ function Vars:set_keymaps()
 	map("n", "r", function() self:refresh() end)
 	map("n", "v", function()
 		local var = self:current_var()
-		if var then require("replconnect.view").open(self.client, var.path) end
+		if not var then
+			return
+		end
+		if var.kind == "function" then
+			require("replconnect.definition").view(self.client, var.path, var.display_name)
+		else
+			require("replconnect.view").open(self.client, var.path)
+		end
+	end)
+
+	map("n", "gd", function()
+		local var = self:current_var()
+		if var and var.kind == "function" then
+			require("replconnect.definition").go(self.client, var.path, var.display_name)
+		elseif var then
+			vim.notify("replconnect: gd goes to the definitions of functions", vim.log.levels.INFO)
+		end
 	end)
 
 	map("n", "<enter>", function()
@@ -547,7 +563,8 @@ function Vars:show_help()
 		" <           collapse (or go to parent)",
 		" <leader><   collapse all levels up to the top-level variable",
 		" ]] / [[     next / previous top-level variable",
-		" v           open in viewer",
+		" v           open in viewer (functions: their source)",
+		" gd          go to a function's definition",
 		" r           refresh",
 		" <leader>y   yank value",
 		" <leader>d   delete variable",

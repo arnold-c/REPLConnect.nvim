@@ -198,6 +198,23 @@ local set_lines = function(buf, lines)
 	vim.bo[buf].modifiable = false
 end
 
+---Show read-only text, such as a function's source, in the client's reusable
+---viewer. Supersedes pending grid selections; only `close` is bound.
+---@param client replconnect.SocketClient
+---@param lines string[]
+---@param lang? string Treesitter language to highlight with (syntax as fallback).
+M.show_text = function(client, lines, lang)
+	local state = state_for(client)
+	state.request = state.request + 1
+	local buf = present(client, state, state.request)
+	local keymaps = vim.deepcopy(require("replconnect.config").options.viewer.keymaps)
+	bind(buf, state, keymaps, { close = "<cmd>close<cr>" })
+	set_lines(buf, lines)
+	if lang and not pcall(vim.treesitter.start, buf, lang) then
+		vim.bo[buf].syntax = lang
+	end
+end
+
 ---Select an access path in the client\'s reusable viewer using `viewer_page`.
 ---Only successful, current requests replace its contents and open the pane.
 ---Request errors are reported with vim.notify. Bindings are snapshotted on selection.

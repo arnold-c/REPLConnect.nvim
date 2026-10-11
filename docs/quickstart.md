@@ -94,6 +94,7 @@ require("replconnect").setup()
   The last 10 inputs are kept for this; turn it off at any time with `REPLConnect.record_history!(false)`.
 - `:REPLVariables` toggles the variables pane.
   It refreshes when you enter it, on terminal focus and with `r`.
+  On a function, `v` shows its methods' source in the viewer and `gd` opens its definition in the editor (falling back to your language server's symbol search, with a warning, when the REPL cannot locate it in a file); both need a REPL service with the `definition` capability.
   `g?` lists the pane's keys.
 - `:REPLPlots` toggles static plot history.
   Enable Julia capture with `REPLConnect.capture_plots!(true)`; see [plots.md](plots.md) for renderers, keymaps and saving.

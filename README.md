@@ -59,7 +59,7 @@ Add only the ones you need:
 | `:REPLDetach [language]` | Detach; the REPL keeps running |
 | `:REPLStop[!] [pid\|language]` | Pick a REPL and stop its server (`!` also closes a Neovim terminal REPL) |
 | `:REPLVariables [language]` | Toggle the variables pane |
-| `:REPLVariableViewer [name[.field]]` | Open a table or array in a grid (`v` in the variables pane) |
+| `:REPLVariableViewer [name[.field]]` | Open a table or array in a grid (`v` in the variables pane; on a function `v` shows its source and `gd` goes to its definition) |
 | `:REPLPlots [language]` | Toggle static plot history |
 | `:REPLPlotsRemote [on\|off]` | Toggle streaming plot images to a remote terminal (Snacks) |
 | `:REPLLayout[!]` | Capture current pane sizes as a layout string |

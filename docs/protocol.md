@@ -40,6 +40,7 @@ Services should also not start at all in non-interactive processes.
 | delete | {names: [name, …]} | mutation result |
 | clear | — | mutation result |
 | complete | {code, cursor} | {items: [{label, kind, detail}], start, stop} |
+| definition | {path: [access_key, …]} | {locations: [location, …]} (definition capability) |
 | history | — | recent input records (history capability) |
 | shutdown | — | {} then the service stops serving (shutdown capability) |
 | capabilities (server notification) | {capabilities: [string, …]} | sent to every connection when they change (plots, history) |
@@ -118,6 +119,40 @@ handle disappearing files gracefully. Save a **copy outside the temporary
 directory** before shutdown. Restart invalidates the entire old history and
 all ids; consumers scope callbacks to the attached client, unsubscribe on
 detach and discard old state. No persistence after a crash is promised.
+
+## Function definitions (additive extension)
+
+Services advertising `"definition"` answer `definition` for function
+variables (`kind: "function"`). `path` is resolved structurally, like
+`inspect`. The result lists one location per method (one for languages
+without multiple dispatch), in the order the editor should offer them:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| signature | yes | one-line label, e.g. `f(x::Int)` or `function(x, y = 2)` |
+| file | no | absolute path of the defining file; a pseudo-name such as `REPL[3]` for code typed at the prompt; absent when unknown |
+| line | no | 1-based line of the definition's first line in `file` |
+| source | no | the method's source text, as defined (all lines) |
+| mtime | no | `file`'s modification time in seconds when it was loaded |
+
+An unknown or non-function path is an invalid-params error (-32602); a
+function without known locations returns `{locations: []}`. Send `source`
+whenever it is available, including for files: the editor shows it with `v`,
+and compares its first line with line `line` of `file` to warn when the file
+has changed since loading. Without `source`, `mtime` serves that check, and
+the editor shows an excerpt of the file. `gd` opens `file` at `line` when it is
+a readable file, and otherwise falls back to the language servers'
+`workspace/symbol` search. Paths require the REPL and editor to share a
+filesystem. The request is read-only and may run while idle like `inspect`.
+Fixtures are in `spec/fixtures/definition.json`; a guide for language
+services is in [definition-hook.md](definition-hook.md).
+
+Example:
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"definition","params":{"path":["f"]}}
+{"jsonrpc":"2.0","id":4,"result":{"locations":[{"signature":"f(x::Int)","file":"/home/me/project/src/f.jl","line":12,"source":"function f(x::Int)\n    x + 1\nend"},{"signature":"f()","file":"REPL[3]","line":1,"source":"f() = 0"}]}}
+```
 
 ## Other language producers
 

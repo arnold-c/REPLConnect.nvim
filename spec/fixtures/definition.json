@@ -1,0 +1,6 @@
+{
+  "cases": [
+    {"request": {"jsonrpc":"2.0","id":1,"method":"definition","params":{"path":["__replconnect_missing__"]}}, "response": {"jsonrpc":"2.0","id":1,"error":{"code":-32602}}}
+  ],
+  "example": {"jsonrpc":"2.0","id":4,"result":{"locations":[{"signature":"f(x::Int)","file":"/home/me/project/src/f.jl","line":12,"source":"function f(x::Int)\n    x + 1\nend","mtime":1760000000},{"signature":"f()","file":"REPL[3]","line":1,"source":"f() = 0"}]}}
+}
