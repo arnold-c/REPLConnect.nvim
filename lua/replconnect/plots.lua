@@ -20,6 +20,7 @@ function Plots.init(client, opts, open_window, may_auto_open)
 	if not Plots.supported(client) then return nil end
 	local self = Buf.init(Plots, { name = "replconnect://plots/" .. client.language })
 	self.client, self.records, self.follow, self.alive = client, {}, true, true
+	self.dismissed = {} -- ids removed from history; refresh must not resurrect them
 	self.opts = opts or require("replconnect.config").options.plots
 	self.open_window = open_window
 	self.may_auto_open = may_auto_open
@@ -34,6 +35,8 @@ function Plots.init(client, opts, open_window, may_auto_open)
 		follow = function() self:latest() end,
 		external = function() self:external() end,
 		save = function() self:save() end,
+		delete = function() self:delete() end,
+		clear = function() self:clear() end,
 	}
 	for action, keys in pairs(self.opts.keymaps or {}) do
 		if keys and actions[action] then
@@ -76,7 +79,7 @@ function Plots:merge(records, replace)
 			if record.id == self.selected or vim.fn.filereadable(record.path) == 1 then by_id[record.id] = record end
 		end
 	end
-	for _, record in ipairs(records) do if valid(record) then by_id[record.id] = record end end
+	for _, record in ipairs(records) do if valid(record) and not self.dismissed[record.id] then by_id[record.id] = record end end
 	self.records = vim.tbl_values(by_id)
 	table.sort(self.records, function(a, b) return a.id < b.id end)
 	if self.follow or not by_id[self.selected] then
@@ -98,7 +101,7 @@ function Plots:draw()
 	self:clear_image()
 	local record, index = self:current()
 	local lines = { ("Plots · %s · %s"):format(self.client.language, self.follow and "following latest" or "browsing"),
-		"Ctrl-p / Ctrl-n browse · f follow · r refresh · o open · s save · q close" }
+		"Ctrl-p / Ctrl-n browse · f follow · r refresh · o open · s save · <leader>d delete · X clear all · q close" }
 	local exists = record and vim.fn.filereadable(record.path) == 1
 	if not record then
 		lines[#lines + 1] = "No plots yet. Display a plot in the REPL (capture must be enabled)."
@@ -136,6 +139,24 @@ function Plots:move(delta)
 	if not index then return end
 	self.follow = false
 	self.selected = self.records[math.max(1, math.min(#self.records, index + delta))].id
+	self:draw()
+end
+
+---Remove the plot being viewed from the history.
+function Plots:delete()
+	local record, index = self:current()
+	if not record then return end
+	self.dismissed[record.id] = true
+	table.remove(self.records, index)
+	local neighbour = self.records[math.min(index, #self.records)]
+	self.selected = neighbour and neighbour.id or nil
+	self:draw()
+end
+
+---Remove every plot from the history.
+function Plots:clear()
+	for _, record in ipairs(self.records) do self.dismissed[record.id] = true end
+	self.records, self.selected = {}, nil
 	self:draw()
 end
 
