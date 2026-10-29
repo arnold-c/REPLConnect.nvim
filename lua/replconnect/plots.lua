@@ -10,6 +10,14 @@ local function valid(record)
 		and not record.path:find("[%z\r\n]")
 end
 
+---Display text for a keymap binding, or nil when disabled.
+---@param keys? replconnect.Keybinding
+---@return string?
+local function keys_text(keys)
+	if not keys then return nil end
+	return type(keys) == "table" and table.concat(keys, " / ") or keys
+end
+
 function Plots.supported(client)
 	return vim.tbl_contains(client.info and client.info.capabilities or client.capabilities or {}, "plots")
 end
@@ -38,6 +46,7 @@ function Plots.init(client, opts, open_window, may_auto_open)
 		delete = function() self:delete() end,
 		clear = function() self:clear() end,
 		fullscreen = function() self:toggle_fullscreen() end,
+		help = function() self:show_help() end,
 	}
 	for action, keys in pairs(self.opts.keymaps or {}) do
 		if keys and actions[action] then
@@ -107,8 +116,9 @@ function Plots:draw()
 	if not self.alive or not self:valid() then return end
 	self:clear_image()
 	local record, index = self:current()
-	local lines = { ("Plots · %s · %s"):format(self.client.language, self.follow and "following latest" or "browsing"),
-		"Ctrl-p / Ctrl-n browse · Ctrl-e fullscreen · f follow · r refresh · o open · s save · <leader>d delete · X clear all · q close" }
+	local help = keys_text(self.opts.keymaps and self.opts.keymaps.help)
+	local lines = { ("Plots · %s · %s%s"):format(self.client.language, self.follow and "following latest" or "browsing",
+		help and (" · %s help"):format(help) or "") }
 	local exists = record and vim.fn.filereadable(record.path) == 1
 	if not record then
 		lines[#lines + 1] = "No plots yet. Display a plot in the REPL (capture must be enabled)."
@@ -117,7 +127,6 @@ function Plots:draw()
 	else
 		lines[#lines + 1] = ("%d/%d · #%d · %s"):format(index, #self.records, record.id, record.mime)
 		lines[#lines + 1] = record.path
-		lines[#lines + 1] = "Press o to open externally; s saves a permanent copy."
 		if self.renderer.reason then lines[#lines + 1] = "No image renderer: " .. self.renderer.reason end
 		lines[#lines + 1] = ""
 	end
@@ -125,7 +134,7 @@ function Plots:draw()
 	vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, lines)
 	vim.bo[self.buf].modifiable = false
 	local win = self:winid()
-	if exists and win then
+	if exists and win and not self:help_open() then
 		-- row: 0-based buffer row where the image starts (the trailing blank line).
 		local ok, err = pcall(self.renderer.render, record, { buf = self.buf, win = win, row = #lines - 1 })
 		if not ok then
@@ -133,6 +142,43 @@ function Plots:draw()
 			vim.notify("replconnect: image renderer unavailable; press o to open externally: " .. tostring(err), vim.log.levels.WARN)
 		end
 	end
+end
+
+-- Help entries in display order: action, description.
+local HELP = {
+	{ "previous", "previous plot (pauses following)" },
+	{ "next", "next plot (pauses following)" },
+	{ "follow", "follow the latest plot" },
+	{ "fullscreen", "toggle fullscreen" },
+	{ "refresh", "refresh history" },
+	{ "external", "open externally" },
+	{ "save", "save a permanent copy" },
+	{ "delete", "delete plot" },
+	{ "clear", "clear all plots" },
+	{ "help", "show this help" },
+	{ "close", "close" },
+}
+
+---Show the configured shortcuts in a float. The plot is cleared while it
+---is open: image renderers would otherwise draw over or under the float.
+function Plots:show_help()
+	local entries = {}
+	for _, item in ipairs(HELP) do
+		local keys = keys_text(self.opts.keymaps and self.opts.keymaps[item[1]])
+		if keys then entries[#entries + 1] = { keys, item[2] } end
+	end
+	self:clear_image()
+	local help
+	help = require("replconnect.help").open("Plot pane shortcuts", entries, function()
+		if self.help_win == help then self.help_win = nil end
+		self:draw()
+	end)
+	self.help_win = help
+end
+
+---Whether the help float is open (the image stays hidden meanwhile).
+function Plots:help_open()
+	return self.help_win ~= nil and vim.api.nvim_win_is_valid(self.help_win)
 end
 
 ---Redraw only when the plot window is among the resized `windows`.

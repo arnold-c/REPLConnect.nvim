@@ -3,7 +3,8 @@ vim.opt.runtimepath:prepend(vim.fn.getcwd())
 local Plots = require("replconnect.plots")
 local config = require("replconnect.config")
 local renders, clears = {}, 0
-local renderer = { render = function(record) renders[#renders + 1] = record.id end,
+local last_ctx
+local renderer = { render = function(record, ctx) renders[#renders + 1], last_ctx = record.id, ctx end,
 	clear = function() clears = clears + 1 end }
 config.set({ plots = { renderer = renderer, auto_open = true } })
 assert(config.options.plots.keymaps.next == "<C-n>")
@@ -78,6 +79,26 @@ pane:resized({ float })
 pane:resized(nil)
 assert(#renders == before, "unrelated resize must not redraw plots")
 vim.api.nvim_win_close(float, true)
+-- Shortcuts live in a g? float, not in the pane text above the image.
+local pane_lines = vim.api.nvim_buf_get_lines(pane.buf, 0, -1, false)
+assert(pane_lines[1]:find("g? help", 1, true), pane_lines[1])
+assert(not table.concat(pane_lines, "\n"):find("<C-e>", 1, true))
+assert(last_ctx.row == #pane_lines - 1 and pane_lines[#pane_lines] == "", "image starts on the trailing blank line")
+local origin = vim.api.nvim_get_current_win()
+local cleared = clears
+mapped_action("g?")
+local help_win = vim.api.nvim_get_current_win()
+local help_text = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+assert(vim.api.nvim_win_get_config(help_win).relative == "editor")
+assert(help_text:find("<C%-e>%s+toggle fullscreen") and help_text:find("<leader>d%s+delete plot"), help_text)
+assert(clears > cleared, "the image is hidden behind the help float")
+before = #renders
+pane:draw()
+assert(#renders == before, "no image is drawn while help is open")
+vim.api.nvim_win_close(help_win, true)
+assert(vim.wait(1000, function() return #renders > before end), "closing help redraws the plot")
+vim.api.nvim_set_current_win(origin)
+before = #renders
 pane:resized({ focus, pane:winid() })
 assert(#renders == before + 1, "resizing the plot window must redraw it")
 -- Fullscreen float covers the editor, receives the render, and toggles back.

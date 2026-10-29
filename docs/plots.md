@@ -101,6 +101,11 @@ the server removes its files; history does not survive shutdown.
 | `o` | explicitly open current file using `vim.ui.open` |
 | `s` | save a permanent copy; prompts for a destination |
 | `Ctrl-e` | toggle a fullscreen floating window for the plot |
+| `<leader>d` / `X` | delete the current plot / clear all plots |
+| `g?` | show these shortcuts in a float (the plot is hidden meanwhile) |
+
+The pane's header only names the help key, so the text above the plot
+stays short and does not wrap into it.
 
 Set `plots.keymaps.fullscreen` to change the fullscreen key (or `false` to
 disable it). Closing the float (`Ctrl-e` again, `:q`) redraws the plot in
@@ -120,7 +125,8 @@ require("replconnect").setup({
     renderer = "auto", -- "snacks", "image.nvim", "external", or custom adapter
     auto_open = false, -- true opens on new plots without moving editor focus
     keymaps = { close = "q", next = "<C-n>", previous = "<C-p>", refresh = "r",
-                follow = "f", external = "o", save = "s", fullscreen = "<C-e>" },
+                follow = "f", external = "o", save = "s", fullscreen = "<C-e>",
+                help = "g?" },
   },
 })
 ```

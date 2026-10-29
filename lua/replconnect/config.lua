@@ -70,10 +70,10 @@
 ---@field keymaps? replconnect.ViewerKeymaps | false Set false to disable all viewer mappings.
 
 ---@class replconnect.PlotsConfig
----@field renderer? "auto" | "snacks" | "image.nvim" | "external" | table Custom {render(record, {buf, win}), clear()} closures.
+---@field renderer? "auto" | "snacks" | "image.nvim" | "external" | table Custom {render(record, {buf, win, row}), clear()} closures.
 ---@field remote? boolean | "auto" Stream plot images through the terminal (Snacks) instead of sending file paths. "auto" (default) streams over SSH when snacks.nvim is loaded; true/false force it on/off.
 ---@field auto_open? boolean Show new plots without stealing focus; default false.
----@field keymaps? table<string, replconnect.Keybinding> | false Actions: close, next, previous, refresh, follow, external, save, delete, clear, fullscreen.
+---@field keymaps? table<string, replconnect.Keybinding> | false Actions: close, next, previous, refresh, follow, external, save, delete, clear, fullscreen, help.
 
 local M = {}
 
@@ -103,7 +103,7 @@ local defaults = {
 		auto_open = false,
 		keymaps = { close = "q", next = "<C-n>", previous = "<C-p>", refresh = "r",
 			follow = "f", external = "o", save = "s",
-			delete = "<leader>d", clear = "X", fullscreen = "<C-e>" },
+			delete = "<leader>d", clear = "X", fullscreen = "<C-e>", help = "g?" },
 	},
 	viewer = {
 		keymaps = {

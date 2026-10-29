@@ -10,6 +10,16 @@ local function external(reason)
 	return { name = "external", reason = reason, render = noop, clear = noop }
 end
 
+---Cell box below the pane text for an image anchored at buffer row `row`
+---(0-based). Wrapped text above it takes more screen rows than buffer lines.
+---@return integer width, integer height
+local function image_area(win, row)
+	local text_rows = row > 0 and vim.api.nvim_win_text_height(win, { start_row = 0, end_row = row - 1 }).all or 0
+	local textoff = vim.fn.getwininfo(win)[1].textoff
+	return math.max(1, vim.api.nvim_win_get_width(win) - textoff),
+		math.max(1, vim.api.nvim_win_get_height(win) - text_rows)
+end
+
 ---@return table? adapter, string? reason
 local function snacks()
 	local ok, image = pcall(require, "snacks.image")
@@ -26,8 +36,9 @@ local function snacks()
 			if placement then placement:close(); placement = nil end
 		end,
 		render = function(record, ctx)
+			local width, height = image_area(ctx.win, ctx.row)
 			placement = image.placement.new(ctx.buf, record.path, { pos = { ctx.row + 1, 0 }, inline = true, auto_resize = true,
-				max_width = vim.api.nvim_win_get_width(ctx.win), max_height = math.max(1, vim.api.nvim_win_get_height(ctx.win) - 5) })
+				max_width = width, max_height = height })
 		end,
 	}
 end
@@ -47,16 +58,6 @@ function M.snacks_remote(on)
 	terminal._env = nil
 	require("snacks.image.image").clear()
 	return terminal.env().remote == true
-end
-
----Cell box below the pane text for an image anchored at buffer row `row`
----(0-based). Wrapped text above it takes more screen rows than buffer lines.
----@return integer width, integer height
-local function image_area(win, row)
-	local text_rows = row > 0 and vim.api.nvim_win_text_height(win, { start_row = 0, end_row = row - 1 }).all or 0
-	local textoff = vim.fn.getwininfo(win)[1].textoff
-	return math.max(1, vim.api.nvim_win_get_width(win) - textoff),
-		math.max(1, vim.api.nvim_win_get_height(win) - text_rows)
 end
 
 ---@return table? adapter, string? reason

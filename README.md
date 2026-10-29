@@ -97,7 +97,7 @@ require("replconnect").setup({
     remote = "auto",         -- stream images via Snacks: "auto" (over SSH, if snacks is loaded) | true | false
     auto_open = false,
     keymaps = { close = "q", next = "<C-n>", previous = "<C-p>", refresh = "r",
-      follow = "f", external = "o", save = "s", fullscreen = "<C-e>" },
+      follow = "f", external = "o", save = "s", fullscreen = "<C-e>", help = "g?" },
   },
   viewer = {
     keymaps = {
