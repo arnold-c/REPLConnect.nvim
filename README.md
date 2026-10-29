@@ -8,6 +8,7 @@ Setup is in [docs/quickstart.md](docs/quickstart.md); plot capture, renderers an
 - Neovim 0.10 or later (window moves need it).
 - A language plugin for each REPL you want to inspect (see below).
 - Optional: [snacks.nvim](https://github.com/folke/snacks.nvim) (pickers, plot rendering, remote plot streaming) and [image.nvim](https://github.com/3rd/image.nvim) (plot rendering).
+  With image.nvim's `window_overlap_clear_enabled`, add floating-UI filetypes such as `noice` to `window_overlap_clear_ft_ignore`, or plots vanish behind them; see [docs/plots.md](docs/plots.md#imagenvim-setup).
 
 ## Installation
 
@@ -96,8 +97,10 @@ require("replconnect").setup({
     renderer = "auto",       -- "snacks" | "image.nvim" | "external" | custom table
     remote = "auto",         -- stream images via Snacks: "auto" (over SSH, if snacks is loaded) | true | false
     auto_open = false,
+    redraw_delay_ms = 100,   -- redraw again after startup/resize/focus repaints; false disables
     keymaps = { close = "q", next = "<C-n>", previous = "<C-p>", refresh = "r",
-      follow = "f", external = "o", save = "s", fullscreen = "<C-e>", help = "g?" },
+      follow = "f", external = "o", save = "s", delete = "<leader>d", clear = "X",
+      fullscreen = "<C-e>", help = "g?" },
   },
   viewer = {
     keymaps = {

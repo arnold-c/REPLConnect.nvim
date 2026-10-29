@@ -140,15 +140,7 @@ image.nvim. Install/configure one of these plugins yourself:
   Use `:checkhealth snacks` to diagnose terminal/conversion requirements.
 - [image.nvim](https://github.com/3rd/image.nvim): configure its backend and
   processor in `require("image").setup(...)`. Follow its terminal and tmux
-  setup documentation. The plot is fitted below the pane text and ignores
-  image.nvim's `max_width`/`max_height` and window-percentage limits.
-
-Terminals and multiplexers repaint the screen at startup, on resize and when
-you return to a pane (e.g. switching Rex or tmux tabs), which can wipe an
-image that was sent just before. The pane therefore redraws once more
-`redraw_delay_ms` after opening, startup, resize and `FocusGained`. If a
-plot still vanishes, raise the delay; if it never returns after switching
-tabs, check that the multiplexer forwards focus events to Neovim.
+  setup documentation, and see [image.nvim setup](#imagenvim-setup) below.
 
 SVG conversion depends on the image plugin and installed conversion tools.
 REPLConnect keeps the original SVG rather than relabelling it PNG. An unavailable
@@ -159,6 +151,51 @@ is delegated to the renderer; non-graphics terminals can use `o`.
 
 When no renderer is available, the pane shows `No image renderer: <reason>`
 so that a silent fallback is not mistaken for a missing plot.
+
+### image.nvim setup
+
+The plot is fitted to the space below the pane text. REPLConnect ignores
+image.nvim's `max_width`, `max_height`, `max_width_window_percentage` and
+`max_height_window_percentage` for plots, so they need no changes.
+
+With `window_overlap_clear_enabled = true`, image.nvim hides an image while
+**any** floating window overlaps its window, even partly. Floating UI that
+spans the screen edge, such as noice's messages and command line, then
+hides the plot pane: the plot flashes and disappears in a fresh session, or
+only shows after entering the pane. Ignore those filetypes. Setting
+`window_overlap_clear_ft_ignore` replaces image.nvim's defaults, so keep
+them:
+
+```lua
+require("image").setup({
+  backend = "kitty",
+  window_overlap_clear_enabled = true,
+  window_overlap_clear_ft_ignore = {
+    "cmp_menu", "cmp_docs", "snacks_notif", "scrollview", "scrollview_sign", -- defaults
+    "noice",
+  },
+})
+```
+
+To find the float hiding a blank plot, list the floating windows while the
+pane is blank and look for one overlapping it:
+
+```vim
+:lua for _, w in ipairs(vim.api.nvim_list_wins()) do local c = vim.api.nvim_win_get_config(w); if c.relative ~= "" then print(w, vim.bo[vim.api.nvim_win_get_buf(w)].filetype, c.row, c.col, c.width .. "x" .. c.height) end end
+```
+
+Alternatively set `window_overlap_clear_enabled = false`; images then also
+stay visible under completion menus. image.nvim's `debug = { enabled = true }`
+logs why a render was skipped (e.g. `overlap`) to `/tmp/image.nvim.log`.
+
+### Repaints and redraws
+
+Terminals and multiplexers repaint the screen at startup, on resize and when
+you return to a pane (e.g. switching Rex or tmux tabs), which can wipe an
+image that was sent just before. The pane therefore redraws once more
+`redraw_delay_ms` after opening, startup, resize and `FocusGained`. If a
+plot still vanishes, raise the delay; if it never returns after switching
+tabs, check that the multiplexer forwards focus events to Neovim.
 
 ### Over SSH
 

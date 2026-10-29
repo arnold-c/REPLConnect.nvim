@@ -98,6 +98,8 @@ require("replconnect").setup()
   `g?` lists the pane's keys.
 - `:REPLPlots` toggles static plot history.
   Enable Julia capture with `REPLConnect.capture_plots!(true)`; see [plots.md](plots.md) for renderers, keymaps and saving.
+  `g?` lists the pane's keys.
+  With image.nvim, a plot that flashes and disappears is usually hidden by a floating window (e.g. noice); see [plots.md](plots.md#imagenvim-setup).
 - `:REPLPlotsRemote [on|off]` toggles streaming plot images to a remote terminal via Snacks; see [plots.md](plots.md).
 - `:REPLLayout[!]` captures the current pane sizes as a layout string and copies it (`!` also applies it this session); see the README.
 - `:REPLVariableViewer [name[.field]]` opens a grid for a table or array.
