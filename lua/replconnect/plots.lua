@@ -37,6 +37,7 @@ function Plots.init(client, opts, open_window, may_auto_open)
 		save = function() self:save() end,
 		delete = function() self:delete() end,
 		clear = function() self:clear() end,
+		fullscreen = function() self:toggle_fullscreen() end,
 	}
 	for action, keys in pairs(self.opts.keymaps or {}) do
 		if keys and actions[action] then
@@ -53,7 +54,10 @@ function Plots.init(client, opts, open_window, may_auto_open)
 	vim.api.nvim_create_autocmd("WinResized", { group = self.group,
 		callback = function() self:resized(vim.v.event.windows) end })
 	vim.api.nvim_create_autocmd("VimResized", { group = self.group,
-		callback = function() if self:winid() then self:draw() end end })
+		callback = function()
+			if self:fullscreen_win() then vim.api.nvim_win_set_config(self.float, self:float_config()) end
+			if self:winid() then self:draw() end
+		end })
 	-- Install before subscribing; merge the snapshot with already delivered events.
 	self.unsubscribe = client:on("display", function(record)
 		if not self.alive or self.client.closed then return end
@@ -101,7 +105,7 @@ function Plots:draw()
 	self:clear_image()
 	local record, index = self:current()
 	local lines = { ("Plots · %s · %s"):format(self.client.language, self.follow and "following latest" or "browsing"),
-		"Ctrl-p / Ctrl-n browse · f follow · r refresh · o open · s save · <leader>d delete · X clear all · q close" }
+		"Ctrl-p / Ctrl-n browse · Ctrl-e fullscreen · f follow · r refresh · o open · s save · <leader>d delete · X clear all · q close" }
 	local exists = record and vim.fn.filereadable(record.path) == 1
 	if not record then
 		lines[#lines + 1] = "No plots yet. Display a plot in the REPL (capture must be enabled)."
@@ -132,6 +136,44 @@ end
 function Plots:resized(windows)
 	local win = self:winid()
 	if win and vim.tbl_contains(windows or {}, win) then self:draw() end
+end
+
+---The fullscreen float, if open.
+---@return integer?
+function Plots:fullscreen_win()
+	if self.float and vim.api.nvim_win_is_valid(self.float) then return self.float end
+	self.float = nil
+end
+
+---Prefer the fullscreen float so the image is drawn there while it is open.
+function Plots:winid()
+	return self:fullscreen_win() or Buf.winid(self)
+end
+
+function Plots:float_config()
+	local height = vim.o.lines - vim.o.cmdheight - (vim.o.laststatus > 0 and 1 or 0)
+	return { relative = "editor", row = 0, col = 0, width = vim.o.columns,
+		height = math.max(1, height), style = "minimal", border = "none" }
+end
+
+---Show the plot in a floating window covering the editor, or close it.
+function Plots:toggle_fullscreen()
+	if self:fullscreen_win() then
+		pcall(vim.api.nvim_win_close, self.float, true)
+		return
+	end
+	local previous = vim.api.nvim_get_current_win()
+	self.float = vim.api.nvim_open_win(self.buf, true, self:float_config())
+	local float = self.float
+	vim.api.nvim_create_autocmd("WinClosed", { group = self.group, pattern = tostring(float), once = true,
+		callback = function()
+			if self.float == float then self.float = nil end
+			vim.schedule(function()
+				if vim.api.nvim_win_is_valid(previous) then pcall(vim.api.nvim_set_current_win, previous) end
+				self:draw()
+			end)
+		end })
+	self:draw()
 end
 
 function Plots:move(delta)

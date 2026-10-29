@@ -80,6 +80,18 @@ assert(#renders == before, "unrelated resize must not redraw plots")
 vim.api.nvim_win_close(float, true)
 pane:resized({ focus, pane:winid() })
 assert(#renders == before + 1, "resizing the plot window must redraw it")
+-- Fullscreen float covers the editor, receives the render, and toggles back.
+local split_win = pane:winid()
+before = #renders
+mapped_action("<C-e>")
+local full = pane:fullscreen_win()
+assert(full and pane:winid() == full and vim.api.nvim_get_current_win() == full)
+assert(vim.api.nvim_win_get_config(full).relative == "editor")
+assert(vim.api.nvim_win_get_width(full) == vim.o.columns)
+assert(#renders == before + 1)
+mapped_action("<C-e>")
+assert(not pane:fullscreen_win() and pane:winid() == split_win)
+assert(vim.wait(1000, function() return #renders == before + 2 end), "closing fullscreen must redraw the pane")
 before = #renders
 pane:hide()
 assert(not pane:winid() and clears > 0)
