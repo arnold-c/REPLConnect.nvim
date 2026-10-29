@@ -26,7 +26,7 @@ local function snacks()
 			if placement then placement:close(); placement = nil end
 		end,
 		render = function(record, ctx)
-			placement = image.placement.new(ctx.buf, record.path, { pos = { 6, 0 }, inline = true, auto_resize = true,
+			placement = image.placement.new(ctx.buf, record.path, { pos = { ctx.row + 1, 0 }, inline = true, auto_resize = true,
 				max_width = vim.api.nvim_win_get_width(ctx.win), max_height = math.max(1, vim.api.nvim_win_get_height(ctx.win) - 5) })
 		end,
 	}
@@ -49,6 +49,16 @@ function M.snacks_remote(on)
 	return terminal.env().remote == true
 end
 
+---Cell box below the pane text for an image anchored at buffer row `row`
+---(0-based). Wrapped text above it takes more screen rows than buffer lines.
+---@return integer width, integer height
+local function image_area(win, row)
+	local text_rows = row > 0 and vim.api.nvim_win_text_height(win, { start_row = 0, end_row = row - 1 }).all or 0
+	local textoff = vim.fn.getwininfo(win)[1].textoff
+	return math.max(1, vim.api.nvim_win_get_width(win) - textoff),
+		math.max(1, vim.api.nvim_win_get_height(win) - text_rows)
+end
+
 ---@return table? adapter, string? reason
 local function image_nvim()
 	local ok, image = pcall(require, "image")
@@ -60,9 +70,14 @@ local function image_nvim()
 			if instance then instance:clear(); instance = nil end
 		end,
 		render = function(record, ctx)
-			instance = image.from_file(record.path, { buffer = ctx.buf, window = ctx.win, x = 0, y = 3,
-				width = vim.api.nvim_win_get_width(ctx.win), height = math.max(1, vim.api.nvim_win_get_height(ctx.win) - 3) })
-			if instance then instance:render() end
+			local width, height = image_area(ctx.win, ctx.row)
+			instance = image.from_file(record.path, { buffer = ctx.buf, window = ctx.win, x = 0, y = ctx.row,
+				width = width, height = height })
+			if not instance then return end
+			-- The pane is the bound; image.nvim's default caps the height at 50%
+			-- of the window, which shrinks the width of plots in short splits.
+			instance.ignore_global_max_size = true
+			instance:render()
 		end,
 	}
 end

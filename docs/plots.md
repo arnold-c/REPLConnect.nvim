@@ -133,7 +133,8 @@ image.nvim. Install/configure one of these plugins yourself:
   Use `:checkhealth snacks` to diagnose terminal/conversion requirements.
 - [image.nvim](https://github.com/3rd/image.nvim): configure its backend and
   processor in `require("image").setup(...)`. Follow its terminal and tmux
-  setup documentation.
+  setup documentation. The plot is fitted below the pane text and ignores
+  image.nvim's `max_width`/`max_height` and window-percentage limits.
 
 SVG conversion depends on the image plugin and installed conversion tools.
 REPLConnect keeps the original SVG rather than relabelling it PNG. An unavailable
@@ -197,7 +198,9 @@ A custom adapter is a table of closures:
 
 ```lua
 plots = { renderer = {
-  render = function(record, context) -- context = {buf = ..., win = ...}
+  -- context = {buf = ..., win = ..., row = ...}; row is the 0-based buffer
+  -- row below the pane text where the image should start
+  render = function(record, context)
     -- render record.path, respecting record.mime; do not evaluate record content
   end,
   clear = function() -- remove all previously displayed images

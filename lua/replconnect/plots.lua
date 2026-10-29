@@ -58,6 +58,9 @@ function Plots.init(client, opts, open_window, may_auto_open)
 			if self:fullscreen_win() then vim.api.nvim_win_set_config(self.float, self:float_config()) end
 			if self:winid() then self:draw() end
 		end })
+	-- Multiplexers may drop graphics placements while Neovim is unfocused.
+	vim.api.nvim_create_autocmd("FocusGained", { group = self.group,
+		callback = function() if self:winid() then self:draw() end end })
 	-- Install before subscribing; merge the snapshot with already delivered events.
 	self.unsubscribe = client:on("display", function(record)
 		if not self.alive or self.client.closed then return end
@@ -123,7 +126,8 @@ function Plots:draw()
 	vim.bo[self.buf].modifiable = false
 	local win = self:winid()
 	if exists and win then
-		local ok, err = pcall(self.renderer.render, record, { buf = self.buf, win = win })
+		-- row: 0-based buffer row where the image starts (the trailing blank line).
+		local ok, err = pcall(self.renderer.render, record, { buf = self.buf, win = win, row = #lines - 1 })
 		if not ok then
 			self:clear_image()
 			vim.notify("replconnect: image renderer unavailable; press o to open externally: " .. tostring(err), vim.log.levels.WARN)

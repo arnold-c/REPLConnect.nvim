@@ -19,12 +19,15 @@ package.loaded["image"] = { from_file = function(path, options)
 	image = { render = function() image.rendered = true end, clear = function() cleared = true end }
 	return image
 end }
-local ctx = { buf = vim.api.nvim_get_current_buf(), win = vim.api.nvim_get_current_win() }
+local ctx = { buf = vim.api.nvim_get_current_buf(), win = vim.api.nvim_get_current_win(), row = 2 }
+-- A long line above the anchor wraps, so the image must start lower.
+vim.api.nvim_buf_set_lines(ctx.buf, 0, -1, false, { "title", ("x"):rep(vim.o.columns + 1), "" })
 local record = { id = 1, mime = "image/svg+xml", path = "/tmp/example.svg" }
 local adapter = renderers.create("auto")
 assert(adapter.name == "Snacks")
 adapter.render(record, ctx)
 assert(opts.inline and opts.auto_resize and opts.max_width > 0 and src == record.path)
+assert(opts.pos[1] == ctx.row + 1)
 adapter.clear()
 assert(closed)
 supports = false
@@ -32,6 +35,8 @@ adapter = renderers.create("auto")
 assert(adapter.name == "image.nvim")
 adapter.render(record, ctx)
 assert(image.rendered and src == record.path and opts.buffer == ctx.buf and opts.window == ctx.win)
+assert(opts.y == ctx.row and image.ignore_global_max_size)
+assert(opts.height == vim.api.nvim_win_get_height(ctx.win) - 3, "wrapped header takes three rows")
 adapter.clear()
 assert(cleared)
 local fallback = renderers.create("snacks")
