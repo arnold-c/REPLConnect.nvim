@@ -554,43 +554,22 @@ end
 
 ---Show the available shortcuts in a floating window.
 function Vars:show_help()
-	local lines = {
-		" Variable viewer shortcuts",
-		"",
-		" <enter>     toggle expand/collapse",
-		" >           expand",
-		" <leader>>   expand all levels recursively",
-		" <           collapse (or go to parent)",
-		" <leader><   collapse all levels up to the top-level variable",
-		" ]] / [[     next / previous top-level variable",
-		" v           open in viewer (functions: their source)",
-		" gd          go to a function's definition",
-		" r           refresh",
-		" <leader>y   yank value",
-		" <leader>d   delete variable",
-		" X           clear all variables",
-		" g?          show this help",
-		" q           close",
-	}
-	local width = 0
-	for _, l in ipairs(lines) do
-		width = math.max(width, vim.fn.strwidth(l) + 1)
-	end
-	local hbuf = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_lines(hbuf, 0, -1, false, lines)
-	vim.bo[hbuf].modifiable = false
-	local win = vim.api.nvim_open_win(hbuf, true, {
-		relative = "editor",
-		width = width,
-		height = #lines,
-		row = math.max(0, math.floor((vim.o.lines - #lines) / 2)),
-		col = math.max(0, math.floor((vim.o.columns - width) / 2)),
-		style = "minimal",
-		border = "rounded",
+	require("replconnect.help").open("Variable viewer shortcuts", {
+		{ "<enter>", "toggle expand/collapse" },
+		{ ">", "expand" },
+		{ "<leader>>", "expand all levels recursively" },
+		{ "<", "collapse (or go to parent)" },
+		{ "<leader><", "collapse all levels up to the top-level variable" },
+		{ "]] / [[", "next / previous top-level variable" },
+		{ "v", "open in viewer (functions: their source)" },
+		{ "gd", "go to a function's definition" },
+		{ "r", "refresh" },
+		{ "<leader>y", "yank value" },
+		{ "<leader>d", "delete variable" },
+		{ "X", "clear all variables" },
+		{ "g?", "show this help" },
+		{ "q", "close" },
 	})
-	for _, key in ipairs({ "q", "<esc>", "<cr>", "g?" }) do
-		vim.keymap.set("n", key, function() pcall(vim.api.nvim_win_close, win, true) end, { buffer = hbuf, silent = true })
-	end
 end
 
 ---Replace buffer lines and session-namespace highlights from the current cached tree.
