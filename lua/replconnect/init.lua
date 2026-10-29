@@ -90,7 +90,7 @@ function pane_opener(language, name)
 		return require("replconnect.layout").show(name, bufs, {
 			hide = hide,
 			on_restore = function(restored)
-				if restored == "plots" and plots and plots.alive then plots:draw() end
+				if restored == "plots" and plots and plots.alive then plots:draw(); plots:settle() end
 				if restored == "vars" and vars and vars:valid() then vars:redraw() end
 			end,
 		})

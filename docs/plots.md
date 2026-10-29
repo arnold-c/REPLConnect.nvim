@@ -124,6 +124,7 @@ require("replconnect").setup({
   plots = {
     renderer = "auto", -- "snacks", "image.nvim", "external", or custom adapter
     auto_open = false, -- true opens on new plots without moving editor focus
+    redraw_delay_ms = 100, -- follow-up redraw after screen repaints; false disables
     keymaps = { close = "q", next = "<C-n>", previous = "<C-p>", refresh = "r",
                 follow = "f", external = "o", save = "s", fullscreen = "<C-e>",
                 help = "g?" },
@@ -141,6 +142,13 @@ image.nvim. Install/configure one of these plugins yourself:
   processor in `require("image").setup(...)`. Follow its terminal and tmux
   setup documentation. The plot is fitted below the pane text and ignores
   image.nvim's `max_width`/`max_height` and window-percentage limits.
+
+Terminals and multiplexers repaint the screen at startup, on resize and when
+you return to a pane (e.g. switching Rex or tmux tabs), which can wipe an
+image that was sent just before. The pane therefore redraws once more
+`redraw_delay_ms` after opening, startup, resize and `FocusGained`. If a
+plot still vanishes, raise the delay; if it never returns after switching
+tabs, check that the multiplexer forwards focus events to Neovim.
 
 SVG conversion depends on the image plugin and installed conversion tools.
 REPLConnect keeps the original SVG rather than relabelling it PNG. An unavailable

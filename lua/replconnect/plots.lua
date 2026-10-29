@@ -66,10 +66,12 @@ function Plots.init(client, opts, open_window, may_auto_open)
 		callback = function()
 			if self:fullscreen_win() then vim.api.nvim_win_set_config(self.float, self:float_config()) end
 			if self:winid() then self:draw() end
+			self:settle()
 		end })
-	-- Multiplexers may drop graphics placements while Neovim is unfocused.
-	vim.api.nvim_create_autocmd("FocusGained", { group = self.group,
-		callback = function() if self:winid() then self:draw() end end })
+	-- The terminal repaints the whole screen at startup and when focus returns
+	-- (e.g. switching multiplexer tabs), dropping graphics placements.
+	vim.api.nvim_create_autocmd({ "FocusGained", "VimEnter", "UIEnter" }, { group = self.group,
+		callback = function() self:settle() end })
 	-- Install before subscribing; merge the snapshot with already delivered events.
 	self.unsubscribe = client:on("display", function(record)
 		if not self.alive or self.client.closed then return end
@@ -181,6 +183,19 @@ function Plots:help_open()
 	return self.help_win ~= nil and vim.api.nvim_win_is_valid(self.help_win)
 end
 
+---Redraw once the screen has settled. Neovim's UI writes asynchronously, so
+---an image sent right after a screen clear or repaint can be overwritten by
+---it; a short, debounced follow-up redraw places it again afterwards.
+function Plots:settle()
+	local delay = self.opts.redraw_delay_ms
+	if not self.alive or not delay then return end
+	self.settle_timer = self.settle_timer or vim.uv.new_timer()
+	self.settle_timer:stop()
+	self.settle_timer:start(delay, 0, vim.schedule_wrap(function()
+		if self.alive and self:winid() then self:draw() end
+	end))
+end
+
 ---Redraw only when the plot window is among the resized `windows`.
 ---@param windows? integer[]
 function Plots:resized(windows)
@@ -284,6 +299,7 @@ function Plots:open(focus, refresh)
 	Buf.open(self, self.open_window)
 	if focus == false and vim.api.nvim_win_is_valid(previous) then vim.api.nvim_set_current_win(previous) end
 	self:draw()
+	self:settle() -- the new window's first paint may land after the image
 	if refresh ~= false then self:refresh() end
 end
 
@@ -326,6 +342,7 @@ end
 
 function Plots:wipe()
 	self.alive = false
+	if self.settle_timer then self.settle_timer:close(); self.settle_timer = nil end
 	if self.unsubscribe then self.unsubscribe(); self.unsubscribe = nil end
 	self:clear_image()
 	vim.api.nvim_del_augroup_by_id(self.group)

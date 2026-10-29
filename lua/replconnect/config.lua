@@ -73,6 +73,7 @@
 ---@field renderer? "auto" | "snacks" | "image.nvim" | "external" | table Custom {render(record, {buf, win, row}), clear()} closures.
 ---@field remote? boolean | "auto" Stream plot images through the terminal (Snacks) instead of sending file paths. "auto" (default) streams over SSH when snacks.nvim is loaded; true/false force it on/off.
 ---@field auto_open? boolean Show new plots without stealing focus; default false.
+---@field redraw_delay_ms? integer | false Redraw the plot this long after opening, startup, resize and focus return, when terminals may repaint over it; false disables. Default 100.
 ---@field keymaps? table<string, replconnect.Keybinding> | false Actions: close, next, previous, refresh, follow, external, save, delete, clear, fullscreen, help.
 
 local M = {}
@@ -101,6 +102,7 @@ local defaults = {
 		renderer = "auto",
 		remote = "auto",
 		auto_open = false,
+		redraw_delay_ms = 100,
 		keymaps = { close = "q", next = "<C-n>", previous = "<C-p>", refresh = "r",
 			follow = "f", external = "o", save = "s",
 			delete = "<leader>d", clear = "X", fullscreen = "<C-e>", help = "g?" },

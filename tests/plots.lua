@@ -6,7 +6,8 @@ local renders, clears = {}, 0
 local last_ctx
 local renderer = { render = function(record, ctx) renders[#renders + 1], last_ctx = record.id, ctx end,
 	clear = function() clears = clears + 1 end }
-config.set({ plots = { renderer = renderer, auto_open = true } })
+-- Follow-up redraws are tested separately; they would make counts racy here.
+config.set({ plots = { renderer = renderer, auto_open = true, redraw_delay_ms = false } })
 assert(config.options.plots.keymaps.next == "<C-n>")
 assert(config.options.plots.keymaps.previous == "<C-p>")
 local requests, handler, unsubscribed = {}, nil, false
@@ -181,6 +182,22 @@ explained:merge({ one })
 explained:open(true, false)
 assert(table.concat(vim.api.nvim_buf_get_lines(explained.buf, 0, -1, false), "\n"):find("No image renderer: no terminal"))
 explained:wipe()
+-- Opening and focus return redraw again once the terminal has repainted.
+config.set({ plots = { renderer = renderer, redraw_delay_ms = 10 } })
+local settling = Plots.init(client, nil)
+settling:merge({ one })
+before = #renders
+settling:open(false, false)
+assert(#renders == before + 1)
+assert(vim.wait(1000, function() return #renders == before + 2 end), "opening redraws once settled")
+before = #renders
+vim.api.nvim_exec_autocmds("FocusGained", {})
+vim.api.nvim_exec_autocmds("FocusGained", {})
+assert(#renders == before, "focus return waits for the repaint")
+assert(vim.wait(1000, function() return #renders == before + 1 end))
+vim.wait(50, function() return false end)
+assert(#renders == before + 1, "a burst of events redraws once")
+settling:wipe()
 vim.fn.delete(destination)
 vim.fn.delete(dir, "rf")
 print("plot pane tests passed")
