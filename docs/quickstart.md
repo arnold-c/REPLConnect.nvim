@@ -70,6 +70,35 @@ vim.opt.runtimepath:append("/path/to/REPLConnect.nvim")
 require("replconnect").setup()
 ```
 
+### Attaching automatically
+
+To attach when you open a Julia or R file, call `require("replconnect").auto_attach()` from a `FileType` autocommand:
+
+```lua
+{
+  "arnold-c/REPLConnect.nvim",
+  ft = { "julia", "r" },
+  opts = {},
+  config = function(_, opts)
+    require("replconnect").setup(opts)
+    -- Attach to the lone REPL in the cwd; otherwise do nothing (:REPLAttach to pick).
+    vim.api.nvim_create_autocmd("FileType", {
+      group = vim.api.nvim_create_augroup("replconnect.auto-attach", { clear = true }),
+      pattern = { "julia", "r" },
+      callback = function() require("replconnect").auto_attach() end,
+    })
+  end,
+}
+```
+
+`auto_attach()` attaches only when exactly one REPL runs in Neovim's working directory (`:pwd`) and its language is not attached yet.
+Otherwise it does nothing: no picker and no warning, so opening a file outside a project with a REPL stays quiet.
+Use `:REPLAttach` to connect to a REPL elsewhere.
+Do not call `:REPLAttach` from an autocommand: it is meant for manual use and opens the picker when it cannot choose.
+
+When lazy.nvim loads the plugin for a filetype (`ft`), it fires `FileType` again for that buffer after `config` runs, so the first file is covered too.
+A repeated attach to a REPL that is still connecting is ignored.
+
 ## Commands
 
 - `:REPLStart [vertical|horizontal] [julia|r] [REPL switches]` opens a terminal split running the REPL for the current buffer's language (asking when no buffer, pane or single attached session decides) and attaches as soon as its server is up.
@@ -91,7 +120,7 @@ require("replconnect").setup()
   Check that command: a non-interactive process that started the service (for example R's `languageserver`) never answers either, and killing it ends your language server.
 - `:REPLAttach [pid]`, `:REPLDetach` (attach to a REPL you started yourself).
   Without a pid, `:REPLAttach` attaches directly only when exactly one REPL runs in Neovim's working directory (`:pwd`); otherwise it opens a picker, even for a single REPL running elsewhere.
-  To attach automatically (for example from a `FileType` autocommand), call `require("replconnect").auto_attach()` instead: it attaches only to the one REPL in Neovim's working directory and otherwise does nothing, with no picker or warning.
+  To attach automatically when you open a file, use `auto_attach()` instead; see [Attaching automatically](#attaching-automatically).
   The picker groups REPLs by working directory: Neovim's first, then the others alphabetically; within a group, REPLs in a Neovim terminal come first, then the most recently started.
   If [snacks.nvim](https://github.com/folke/snacks.nvim) is installed, it previews the last few inputs of the highlighted REPL (otherwise it falls back to `vim.ui.select`).
   The last 10 inputs are kept for this; turn it off at any time with `REPLConnect.record_history!(false)`.
@@ -230,3 +259,4 @@ blink.cmp's default LSP source picks it up with no extra configuration, and it r
 Set `setup{ completion = false }` to turn it off.
 
 The attached client is available through `require("replconnect").client(language)` and `require("replconnect").on_attach(fn)`.
+`require("replconnect").auto_attach()` attaches quietly to the lone REPL in the working directory; see [Attaching automatically](#attaching-automatically).

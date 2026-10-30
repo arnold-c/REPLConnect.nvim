@@ -3,6 +3,7 @@
 -- Usage:
 --   require("replconnect").setup()
 --   :REPLAttach [pid]   pick (or give the pid of) a running REPL session
+--   require("replconnect").auto_attach()  quietly attach to the lone REPL in the cwd
 --   :REPLDetach [language]
 --   :REPLStop[!] [pid|language]  pick a session and stop its server (! also closes its terminal REPL)
 --

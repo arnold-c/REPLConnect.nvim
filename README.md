@@ -39,6 +39,9 @@ A language plugin's `opts` take the same fields as the core's `repl` table (`com
 Language plugins register themselves when loaded, so `opts` are optional.
 Precedence: language default command < core `repl` < language plugin `opts` < core `repl.<language>`.
 
+To attach whenever you open a Julia or R file, call `require("replconnect").auto_attach()` from a `FileType` autocommand.
+It attaches only to the lone REPL in Neovim's working directory and otherwise does nothing; see [Attaching automatically](docs/quickstart.md#attaching-automatically).
+
 ## Language plugins (optional extensions)
 
 `REPLConnect.nvim` ships with no languages.
