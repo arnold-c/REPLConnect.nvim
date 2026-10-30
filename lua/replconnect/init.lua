@@ -538,14 +538,20 @@ local function find_sessions(filter)
 	return sessions
 end
 
----Attach to the session with `pid`, or pick one if there are several.
+---Attach to the session with `pid`, or to the only session running in
+---Neovim's working directory; otherwise pick one. Sessions elsewhere are
+---never attached without asking.
 function M.pick(pid)
 	local sessions = find_sessions({ pid = pid })
 	if #sessions == 0 then
 		return
 	end
-	if #sessions == 1 then
+	if pid then
 		return M.attach(sessions[1])
+	end
+	local here = vim.tbl_filter(discover.in_dir, sessions)
+	if #here == 1 then
+		return M.attach(here[1])
 	end
 	require("replconnect.picker").select(sessions, M.attach)
 end

@@ -90,7 +90,9 @@ require("replconnect").setup()
   A REPL that accepts the connection but never answers (typically left over from a Neovim that did not exit cleanly) is offered to be killed instead, after a second confirmation that shows the process's command line: SIGTERM, then SIGKILL if it is still running a few seconds later.
   Check that command: a non-interactive process that started the service (for example R's `languageserver`) never answers either, and killing it ends your language server.
 - `:REPLAttach [pid]`, `:REPLDetach` (attach to a REPL you started yourself).
-  With several REPLs running, `:REPLAttach` opens a picker; if [snacks.nvim](https://github.com/folke/snacks.nvim) is installed, it previews the last few inputs of the highlighted REPL (otherwise it falls back to `vim.ui.select`).
+  Without a pid, `:REPLAttach` attaches directly only when exactly one REPL runs in Neovim's working directory (`:pwd`); otherwise it opens a picker, even for a single REPL running elsewhere.
+  The picker groups REPLs by working directory: Neovim's first, then the others alphabetically; within a group, REPLs in a Neovim terminal come first, then the most recently started.
+  If [snacks.nvim](https://github.com/folke/snacks.nvim) is installed, it previews the last few inputs of the highlighted REPL (otherwise it falls back to `vim.ui.select`).
   The last 10 inputs are kept for this; turn it off at any time with `REPLConnect.record_history!(false)`.
 - `:REPLVariables` toggles the variables pane.
   It refreshes when you enter it, on terminal focus and with `r`.
@@ -123,7 +125,7 @@ Terminal focus events trigger it on most terminals; in tmux set `focus-events on
 Where focus events are missing, set `poll_interval_ms` to refresh a visible pane on a timer.
 
 If the REPL runs in a Neovim `:terminal` buffer (found by walking up the process tree from the REPL's pid to the terminal's job), the pane also syncs whenever you leave that buffer: back to normal mode with `<C-\><C-n>`, or to another window.
-`:REPLAttach` says when it found the terminal, and lists such sessions first in the picker.
+`:REPLAttach` says when it found the terminal, and lists such sessions first within their working directory's group in the picker.
 Nothing else depends on this.
 
 While the REPL is evaluating, the pane shows `evaluating` and does not scan your variables; it catches up once the REPL is idle.

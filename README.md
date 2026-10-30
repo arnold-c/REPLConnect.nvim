@@ -56,7 +56,7 @@ Add only the ones you need:
 | Command | Effect |
 | --- | --- |
 | `:REPLStart [vertical\|horizontal] [language] [switches]` | Start a REPL in a terminal split and attach |
-| `:REPLAttach [pid]` | Attach to a REPL you started yourself (picker when several) |
+| `:REPLAttach [pid]` | Attach to a REPL you started yourself (picker unless exactly one runs in the cwd) |
 | `:REPLDetach [language]` | Detach; the REPL keeps running |
 | `:REPLStop[!] [pid\|language]` | Pick a REPL and stop its server (`!` also closes a Neovim terminal REPL) |
 | `:REPLVariables [language]` | Toggle the variables pane |

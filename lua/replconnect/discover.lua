@@ -58,19 +58,53 @@ function M.is_live(info)
 		and uv.fs_stat(info.socket) ~= nil
 end
 
----Order for the picker: sessions running in a Neovim terminal (`terminal_buf`)
----first, then those whose cwd is Neovim's, then the most recently started.
+---`path` resolved (symlinks, `~`, trailing slashes) for comparison.
+---@param path string
+---@return string
+local function canonical(path)
+	local normalized = vim.fs.normalize(path)
+	return uv.fs_realpath(normalized) or normalized
+end
+
+---Whether the session `info` runs in directory `cwd` (default: Neovim's).
+---@param info table discovery record
+---@param cwd? string
+---@return boolean
+function M.in_dir(info, cwd)
+	return type(info.cwd) == "string" and info.cwd ~= ""
+		and canonical(info.cwd) == canonical(cwd or vim.fn.getcwd())
+end
+
+---Sort key of `info` for the picker; compared element by element.
+---@param info table discovery record
+---@param cwd string
+---@return (integer|string)[]
+local function sort_key(info, cwd)
+	local has_dir = type(info.cwd) == "string" and info.cwd ~= ""
+	return {
+		M.in_dir(info, cwd) and 0 or has_dir and 1 or 2,
+		has_dir and canonical(info.cwd) or "",
+		info.terminal_buf ~= nil and 0 or 1,
+		-(info.started_at or 0),
+	}
+end
+
+---Order for the picker, grouped by working directory: Neovim's first, then the
+---others alphabetically (sessions without one last). Within a group, sessions
+---in a Neovim terminal (`terminal_buf`) come first, then the most recent.
 function M.sort(sessions, cwd)
+	local keys = {}
+	for _, info in ipairs(sessions) do
+		keys[info] = sort_key(info, cwd)
+	end
 	table.sort(sessions, function(a, b)
-		local a_term, b_term = a.terminal_buf ~= nil, b.terminal_buf ~= nil
-		if a_term ~= b_term then
-			return a_term
+		local ka, kb = keys[a], keys[b]
+		for i = 1, #ka do
+			if ka[i] ~= kb[i] then
+				return ka[i] < kb[i]
+			end
 		end
-		local a_here, b_here = a.cwd == cwd, b.cwd == cwd
-		if a_here ~= b_here then
-			return a_here
-		end
-		return (a.started_at or 0) > (b.started_at or 0)
+		return false
 	end)
 	return sessions
 end

@@ -33,15 +33,19 @@ eq(terminal.terminal_jobs()[bufnr], job)
 eq(terminal.host_buffer(job), bufnr) -- the job itself counts
 assert(terminal.host_buffer(vim.fn.getpid()) == nil, "Neovim itself is not inside its own terminal")
 
--- the picker puts sessions in a Neovim terminal first, then same cwd, then newest
+-- the picker groups sessions by cwd (Neovim's first, then alphabetical, none
+-- last); within a group, Neovim terminals first, then newest
 local sessions = {
 	{ pid = 1, cwd = "/other", started_at = 300 },
 	{ pid = 2, cwd = "/here", started_at = 100 },
 	{ pid = 3, cwd = "/other", started_at = 200, terminal_buf = 9 },
 	{ pid = 4, cwd = "/here", started_at = 400 },
+	{ pid = 5, cwd = "/another", started_at = 50 },
+	{ pid = 6, started_at = 500 },
+	{ pid = 7, cwd = "/here", started_at = 10, terminal_buf = 8 },
 }
 local order = vim.tbl_map(function(s) return s.pid end, discover.sort(sessions, "/here"))
-eq(order, { 3, 4, 2, 1 })
+eq(order, { 7, 4, 2, 5, 3, 1, 6 })
 assert(discover.label({ pid = 3, cwd = "/x", project = "", terminal_buf = 9 }):find("nvim terminal", 1, true))
 assert(not discover.label({ pid = 3, cwd = "/x", project = "" }):find("nvim terminal", 1, true))
 
