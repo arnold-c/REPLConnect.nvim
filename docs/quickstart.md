@@ -91,6 +91,7 @@ require("replconnect").setup()
   Check that command: a non-interactive process that started the service (for example R's `languageserver`) never answers either, and killing it ends your language server.
 - `:REPLAttach [pid]`, `:REPLDetach` (attach to a REPL you started yourself).
   Without a pid, `:REPLAttach` attaches directly only when exactly one REPL runs in Neovim's working directory (`:pwd`); otherwise it opens a picker, even for a single REPL running elsewhere.
+  To attach automatically (for example from a `FileType` autocommand), call `require("replconnect").auto_attach()` instead: it attaches only to the one REPL in Neovim's working directory and otherwise does nothing, with no picker or warning.
   The picker groups REPLs by working directory: Neovim's first, then the others alphabetically; within a group, REPLs in a Neovim terminal come first, then the most recently started.
   If [snacks.nvim](https://github.com/folke/snacks.nvim) is installed, it previews the last few inputs of the highlighted REPL (otherwise it falls back to `vim.ui.select`).
   The last 10 inputs are kept for this; turn it off at any time with `REPLConnect.record_history!(false)`.

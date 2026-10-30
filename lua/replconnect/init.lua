@@ -231,9 +231,18 @@ function reconnect_after_restart(client, host)
 	return true
 end
 
+---Sockets with a connection in progress; a second attach to one is ignored,
+---since it would replace (and close) the first mid-handshake.
+---@type table<string, true>
+local connecting = {}
+
 ---Attach to a discovered session record.
 function M.attach(info, opts)
 	opts = opts or {}
+	if connecting[info.socket] then
+		return
+	end
+	connecting[info.socket] = true
 	local required = opts.required_capabilities or {}
 	M.set_pending(("connecting to pid %d%s"):format(info.pid,
 		#required > 0 and ("; waiting for the service to enable: " .. table.concat(required, ", ")) or ""))
@@ -265,6 +274,7 @@ function M.attach(info, opts)
 			end
 		end,
 	}, function(err, client)
+		connecting[info.socket] = nil
 		M.set_pending(nil)
 		if err then
 			return notify(err, vim.log.levels.ERROR)
@@ -538,6 +548,14 @@ local function find_sessions(filter)
 	return sessions
 end
 
+---The only one of `sessions` running in Neovim's working directory, if any.
+---@param sessions table[] discovery records
+---@return table?
+local function only_here(sessions)
+	local here = vim.tbl_filter(discover.in_dir, sessions)
+	return #here == 1 and here[1] or nil
+end
+
 ---Attach to the session with `pid`, or to the only session running in
 ---Neovim's working directory; otherwise pick one. Sessions elsewhere are
 ---never attached without asking.
@@ -546,14 +564,24 @@ function M.pick(pid)
 	if #sessions == 0 then
 		return
 	end
-	if pid then
-		return M.attach(sessions[1])
-	end
-	local here = vim.tbl_filter(discover.in_dir, sessions)
-	if #here == 1 then
-		return M.attach(here[1])
+	local target = pid and sessions[1] or only_here(sessions)
+	if target then
+		return M.attach(target)
 	end
 	require("replconnect.picker").select(sessions, M.attach)
+end
+
+---For automatic use (e.g. on startup or FileType): attach to the only session
+---running in Neovim's working directory, unless its language is already
+---attached. Otherwise does nothing: no picker, no warning.
+---@return boolean attaching
+function M.auto_attach()
+	local target = only_here(discover.list())
+	if not target or clients[discover.language(target)] then
+		return false
+	end
+	M.attach(target)
+	return true
 end
 
 ---The attached client serving the discovered session `info`, if any.
